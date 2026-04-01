@@ -123,6 +123,23 @@ async function ensureProfileTable() {
     profileTableReady = true;
 }
 
+let historyTableReady = false;
+async function ensureChatHistoryTable() {
+    if (historyTableReady) return;
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS chat_messages (
+            id serial PRIMARY KEY,
+            user_id integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            role text NOT NULL CHECK (role IN ('user','assistant')),
+            content text NOT NULL,
+            created_at timestamp DEFAULT now()
+        );
+        CREATE INDEX IF NOT EXISTS idx_chat_messages_user_created_at
+            ON chat_messages (user_id, created_at DESC);
+    `);
+    historyTableReady = true;
+}
+
 async function getProfileAnswers(userId) {
     await ensureProfileTable();
     const r = await pool.query('SELECT answers FROM user_chad_profile WHERE user_id = $1 LIMIT 1', [userId]);
@@ -250,6 +267,29 @@ router.get('/training', requireAuth, async (req, res) => {
         const userId = Number(req.userId);
         const answers = await getProfileAnswers(userId);
         res.json({ answers });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.get('/history', requireAuth, async (req, res) => {
+    try {
+        const userId = Number(req.userId);
+        await ensureChatHistoryTable();
+        const r = await pool.query(
+            `SELECT role, content, created_at
+             FROM chat_messages
+             WHERE user_id = $1
+             ORDER BY created_at ASC, id ASC
+             LIMIT 200`,
+            [userId]
+        );
+        const messages = r.rows.map((row) => ({
+            role: row.role,
+            content: row.content,
+            created_at: row.created_at,
+        }));
+        res.json({ messages });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -427,6 +467,12 @@ Do not moralize; keep it practical.\n\n${glossaryContext}\n\n${profileContext}\n
             }
         }
         const reply = normalizeSignoff(text, isConversationEnding(latestUser));
+        await ensureChatHistoryTable();
+        await pool.query(
+            `INSERT INTO chat_messages (user_id, role, content)
+             VALUES ($1, 'user', $2), ($1, 'assistant', $3)`,
+            [userId, latestUser, reply]
+        );
         return res.json({ reply });
     } catch (err) {
         console.error('chat error:', err);

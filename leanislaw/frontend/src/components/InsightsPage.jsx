@@ -188,23 +188,6 @@ const InsightsPage = () => {
                 edit calories, steps, or weight.
             </p>
 
-            {data?.sparse_data_hint ? (
-                <p
-                    style={{
-                        margin: "0 0 14px",
-                        fontSize: "0.82rem",
-                        color: "#8a5a00",
-                        backgroundColor: "#fff8eb",
-                        border: "0.5px solid #f5e0b8",
-                        borderRadius: 12,
-                        padding: "12px 14px",
-                        lineHeight: 1.45,
-                    }}
-                >
-                    {data.sparse_data_hint}
-                </p>
-            ) : null}
-
             {err ? (
                 <p style={{ color: "#b45309", fontSize: "0.9rem" }}>{err}</p>
             ) : loading && !data ? (

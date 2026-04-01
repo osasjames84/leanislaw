@@ -34,16 +34,29 @@ const CoachChat = () => {
         Promise.all([
             fetch("/api/v1/chat/training/questions", { headers }).then((r) => r.json().catch(() => ({}))),
             fetch("/api/v1/chat/training", { headers }).then((r) => r.json().catch(() => ({}))),
+            fetch("/api/v1/chat/history", { headers }).then((r) => r.json().catch(() => ({}))),
         ])
-            .then(([qData, aData]) => {
+            .then(([qData, aData, hData]) => {
                 const qs = Array.isArray(qData.questions) ? qData.questions : [];
                 const saved = Array.isArray(aData.answers) ? aData.answers : [];
+                const history = Array.isArray(hData.messages)
+                    ? hData.messages
+                          .filter((m) => m?.role === "assistant" || m?.role === "user")
+                          .map((m) => ({
+                              role: m.role,
+                              content: String(m.content || "").trim(),
+                          }))
+                          .filter((m) => m.content.length > 0)
+                    : [];
                 setTrainingQuestions(qs);
                 const merged = qs.map((q, i) => ({
                     question: q,
                     answer: String(saved[i]?.answer || ""),
                 }));
                 setTrainingAnswers(merged);
+                if (history.length) {
+                    setMessages(history);
+                }
             })
             .catch(() => {
                 setTrainingQuestions([]);

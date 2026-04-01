@@ -114,7 +114,6 @@ const DashboardInsights = ({ token }) => {
     const { units } = useUnits();
     const { data, err, series, stepsVals, weightVals, tdeeVals, rangeLabel } =
         useDashboardTrend(token, 35);
-    const sparseHint = data?.sparse_data_hint;
 
     const lastSteps = stepsVals[stepsVals.length - 1];
     const lastWkg = series.length ? series[series.length - 1]?.weight_kg : null;
@@ -219,18 +218,6 @@ const DashboardInsights = ({ token }) => {
                 </div>
                 </Link>
             </div>
-            {sparseHint ? (
-                <p
-                    style={{
-                        margin: "0 0 10px",
-                        fontSize: "0.78rem",
-                        color: "#8a5a00",
-                        lineHeight: 1.4,
-                    }}
-                >
-                    {sparseHint}
-                </p>
-            ) : null}
             <p style={foot}>
                 <Link to="/log/calories" style={footLink}>
                     Log day
