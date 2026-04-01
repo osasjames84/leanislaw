@@ -16,7 +16,9 @@ import { desc, eq } from 'drizzle-orm';
 
 const router = express.Router();
 
-const CHAD_KNOWLEDGE_SOURCES = (process.env.CHAD_KNOWLEDGE_SOURCES || 'bodyrecomposition,rapid_fat_loss')
+const CHAD_KNOWLEDGE_SOURCES = (
+    process.env.CHAD_KNOWLEDGE_SOURCES || 'bodyrecomposition,rapid_fat_loss,three_percent_man'
+)
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
