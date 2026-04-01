@@ -48,7 +48,10 @@ const Register = () => {
                 role: "client",
             });
             if (u?.needsVerification) {
-                navigate(`/check-email?email=${encodeURIComponent(u.email || "")}`, { replace: true });
+                navigate(`/check-email?email=${encodeURIComponent(u.email || "")}`, {
+                    replace: true,
+                    state: u.devVerificationCode ? { devVerificationCode: u.devVerificationCode } : undefined,
+                });
                 return;
             }
             const needsSetup = u && u.tdee_onboarding_done === false;

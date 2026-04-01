@@ -84,7 +84,14 @@ export function AuthProvider({ children }) {
             throw new Error(data.error || "Registration failed");
         }
         if (!data.token) {
-            return { needsVerification: true, email: data.email };
+            localStorage.removeItem(TOKEN_KEY);
+            setToken("");
+            setUser(null);
+            return {
+                needsVerification: true,
+                email: data.email,
+                devVerificationCode: data.devVerificationCode,
+            };
         }
         localStorage.setItem(TOKEN_KEY, data.token);
         setToken(data.token);

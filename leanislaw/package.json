@@ -3,7 +3,11 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "npm --prefix frontend run test",
+    "test": "npm --prefix frontend run test && npm run test:backend",
+    "test:backend": "node --test 'backend/__tests__/*.test.js'",
+    "email:verification-smoke": "node backend/scripts/send-verification-test-email.mjs",
+    "ingest:knowledge:local": "node backend/scripts/ingest-local-knowledge.mjs",
+    "embed:knowledge": "node backend/scripts/embed-knowledge-chunks.mjs",
     "dev": "nodemon backend/server.js",
     "start": "node backend/server.js",
     "seed-demo-analytics": "node backend/scripts/seed-dashboard-demo.js",
@@ -20,6 +24,7 @@
     "drizzle-orm": "^0.45.1",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
+    "pdf-parse": "^1.1.1",
     "pg": "^8.20.0",
     "stripe": "^17.7.0"
   },

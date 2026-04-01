@@ -79,10 +79,14 @@ router.post('/register', async (req, res) => {
             });
         }
 
-        res.status(201).json({
+        const body = {
             message: 'Check your email for a 6-digit code to verify your account before signing in.',
             email: user.email,
-        });
+        };
+        if (sent.skipped && sent.devCode && process.env.NODE_ENV !== 'production') {
+            body.devVerificationCode = sent.devCode;
+        }
+        res.status(201).json(body);
     } catch (err) {
         if (err.code === '23505') {
             return res.status(409).json({ error: 'Email already registered' });
@@ -273,7 +277,11 @@ router.post('/forgot-password', async (req, res) => {
                 .where(eq(users.id, u.id));
             return res.status(503).json({ error: sent.error || 'Could not send email' });
         }
-        res.json({ ok: true, message });
+        const fpBody = { ok: true, message };
+        if (sent.skipped && sent.devCode && process.env.NODE_ENV !== 'production') {
+            fpBody.devResetCode = sent.devCode;
+        }
+        res.json(fpBody);
     } catch (err) {
         console.error('forgot-password error:', err);
         const msg = [err?.message, err?.cause?.message].filter(Boolean).join('\n');
@@ -368,7 +376,11 @@ router.post('/resend-verification', async (req, res) => {
         if (!sent.ok) {
             return res.status(503).json({ error: sent.error || 'Could not send email' });
         }
-        res.json({ ok: true });
+        const resBody = { ok: true };
+        if (sent.skipped && sent.devCode && process.env.NODE_ENV !== 'production') {
+            resBody.devVerificationCode = sent.devCode;
+        }
+        res.json(resBody);
     } catch (err) {
         console.error('resend-verification error:', err);
         res.status(500).json({ error: 'Could not resend email' });

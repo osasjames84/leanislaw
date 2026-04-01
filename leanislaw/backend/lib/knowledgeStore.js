@@ -1,4 +1,5 @@
 import pool from '../db.js';
+import { cosineSimilarity, embedQuery } from './embeddings.js';
 
 let ready = false;
 
@@ -15,7 +16,15 @@ export async function ensureKnowledgeTable() {
             UNIQUE(source, url, chunk_text)
         );
     `);
+    await pool.query(`ALTER TABLE knowledge_chunks ADD COLUMN IF NOT EXISTS embedding jsonb`);
     ready = true;
+}
+
+function parseEmbedding(row) {
+    const e = row.embedding;
+    if (e == null) return null;
+    if (Array.isArray(e)) return e;
+    return null;
 }
 
 export async function insertKnowledgeChunks(rows) {
@@ -54,27 +63,88 @@ function scoreChunk(query, text) {
     return score;
 }
 
+/** @param {string | string[]} source One source id or list (e.g. ['bodyrecomposition','rapid_fat_loss']) */
 export async function searchKnowledge(query, source = 'bodyrecomposition', limit = 4) {
     await ensureKnowledgeTable();
+    const sources = (Array.isArray(source) ? source : [source]).map((s) => String(s).trim()).filter(Boolean);
+    if (!sources.length) return [];
     const rows = await pool.query(
-        `SELECT id, source, url, title, chunk_text
+        `SELECT id, source, url, title, chunk_text, embedding
          FROM knowledge_chunks
-         WHERE source = $1
+         WHERE source = ANY($1::text[])
          ORDER BY created_at DESC
-         LIMIT 1200`,
-        [source]
+         LIMIT 2000`,
+        [sources]
     );
-    const scored = rows.rows
-        .map((r) => ({ ...r, _score: scoreChunk(query, r.chunk_text + ' ' + r.title) }))
-        .filter((r) => r._score > 0)
+    const lim = Math.max(1, Math.min(12, Number(limit) || 4));
+    const list = rows.rows.map((r) => ({
+        id: r.id,
+        source: r.source,
+        url: r.url,
+        title: r.title,
+        chunk_text: r.chunk_text,
+        _vec: parseEmbedding(r),
+    }));
+
+    const withVec = list.filter((r) => r._vec);
+    const useSemantic =
+        process.env.CHAD_USE_SEMANTIC_KNOWLEDGE !== 'false' &&
+        Boolean(process.env.OPENAI_API_KEY?.trim()) &&
+        withVec.length >= 8 &&
+        list.length > 0 &&
+        withVec.length / list.length >= 0.35;
+
+    let qVec = null;
+    const q = String(query || '').trim();
+    if (useSemantic && q.length > 1) {
+        try {
+            qVec = await embedQuery(q.slice(0, 8000));
+        } catch {
+            qVec = null;
+        }
+    }
+
+    const kwScores = list.map((r) => scoreChunk(query, r.chunk_text + ' ' + r.title));
+    const kwMax = Math.max(1, ...kwScores);
+
+    let scored;
+    if (qVec) {
+        scored = list.map((r, i) => {
+            const kw = kwScores[i] / kwMax;
+            const sem = r._vec ? cosineSimilarity(qVec, r._vec) : 0;
+            const hybrid = r._vec ? 0.72 * sem + 0.28 * kw : kw;
+            return { ...r, _score: hybrid };
+        });
+    } else {
+        scored = list
+            .map((r, i) => ({ ...r, _score: kwScores[i] }))
+            .filter((r) => r._score > 0);
+    }
+
+    return scored
         .sort((a, b) => b._score - a._score)
-        .slice(0, Math.max(1, Math.min(8, Number(limit) || 4)));
-    return scored;
+        .slice(0, lim)
+        .map(({ _vec, _score, ...rest }) => rest);
 }
 
 export async function knowledgeCount(source = 'bodyrecomposition') {
     await ensureKnowledgeTable();
     const r = await pool.query(`SELECT COUNT(*)::int AS c FROM knowledge_chunks WHERE source = $1`, [source]);
     return r.rows[0]?.c || 0;
+}
+
+/** Counts per source for status UI. */
+export async function knowledgeCountsBySource(sources) {
+    await ensureKnowledgeTable();
+    const list = (Array.isArray(sources) ? sources : [sources]).map((s) => String(s).trim()).filter(Boolean);
+    if (!list.length) return {};
+    const r = await pool.query(
+        `SELECT source, COUNT(*)::int AS c FROM knowledge_chunks WHERE source = ANY($1::text[]) GROUP BY source`,
+        [list]
+    );
+    const out = {};
+    for (const s of list) out[s] = 0;
+    for (const row of r.rows) out[row.source] = row.c;
+    return out;
 }
 

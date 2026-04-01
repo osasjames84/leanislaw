@@ -1,12 +1,14 @@
 import { useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 const VerifyEmail = () => {
     const [searchParams] = useSearchParams();
+    const location = useLocation();
     const navigate = useNavigate();
     const emailParam = searchParams.get("email") || "";
     const [email, setEmail] = useState(emailParam);
-    const [code, setCode] = useState("");
+    const preCode = String(location.state?.devVerificationCode || "").replace(/\D/g, "").slice(0, 6);
+    const [code, setCode] = useState(preCode);
     const [msg, setMsg] = useState("");
     const [ok, setOk] = useState(false);
     const [loading, setLoading] = useState(false);

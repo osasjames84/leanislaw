@@ -1,11 +1,20 @@
-import { useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 
 const CheckEmail = () => {
     const [searchParams] = useSearchParams();
+    const location = useLocation();
     const email = searchParams.get("email") || "";
+    const [devCode, setDevCode] = useState(() => location.state?.devVerificationCode || "");
     const [status, setStatus] = useState("");
     const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (location.state?.devVerificationCode) {
+            setDevCode(location.state.devVerificationCode);
+            window.history.replaceState({}, document.title);
+        }
+    }, [location.state]);
 
     const resend = async () => {
         if (!email.trim()) {
@@ -25,7 +34,12 @@ const CheckEmail = () => {
                 setStatus(data.error || "Could not resend.");
                 return;
             }
-            setStatus("Sent — check your inbox (and spam).");
+            if (data.devVerificationCode) {
+                setDevCode(data.devVerificationCode);
+                setStatus("Dev mode: use the code shown below (email was not sent — add RESEND_API_KEY to send real mail).");
+            } else {
+                setStatus("Sent — check your inbox (and spam).");
+            }
         } catch {
             setStatus("Network error.");
         } finally {
@@ -41,10 +55,31 @@ const CheckEmail = () => {
                     We sent a 6-digit code{email ? ` to ${email}` : ""}. Enter it on the verification page to activate
                     your account, then sign in.
                 </p>
+                {devCode ? (
+                    <div
+                        style={{
+                            marginTop: 16,
+                            padding: 14,
+                            borderRadius: 12,
+                            background: "#fffbeb",
+                            border: "1px solid #fcd34d",
+                            fontFamily: "ui-monospace, monospace",
+                            fontSize: "1.35rem",
+                            fontWeight: 800,
+                            letterSpacing: "0.15em",
+                            textAlign: "center",
+                            color: "#92400e",
+                        }}
+                        role="status"
+                    >
+                        {devCode}
+                    </div>
+                ) : null}
                 {email ? (
                     <p style={{ ...p, marginTop: 14 }}>
                         <Link
                             to={`/verify-email?email=${encodeURIComponent(email)}`}
+                            state={devCode ? { devVerificationCode: devCode } : undefined}
                             style={{ ...link, fontWeight: 700 }}
                         >
                             Enter verification code

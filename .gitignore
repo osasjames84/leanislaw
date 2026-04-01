@@ -1,0 +1,7 @@
+# Local secrets — never commit
+leanislaw/backend/.env
+*.dump
+leanislaw/leanislaw_local.sql
+# Local drafts for Chad ingest (keep folder; ignore manuscript files)
+leanislaw/backend/knowledge/*
+!leanislaw/backend/knowledge/.gitkeep

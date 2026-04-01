@@ -3,12 +3,23 @@ import { requireAuth } from '../middleware/auth.js';
 import { requireCoach } from './coaching.js';
 import { glossaryMatchesFromText } from '../lib/chadGlossary.js';
 import { loreSystemContext } from '../lib/chadLore.js';
-import { knowledgeCount, searchKnowledge } from '../lib/knowledgeStore.js';
+import {
+    rflBookFaithfulContext,
+    rflProteinGPerLbLbm,
+    rflReplyLooksGenericDeficit,
+} from '../lib/chadRflBookRules.js';
+import { chadCorePrinciplesContext } from '../lib/chadPrinciples.js';
+import { knowledgeCountsBySource, searchKnowledge } from '../lib/knowledgeStore.js';
 import pool, { db } from '../db.js';
 import { bodyMetrics, daily_logs, userMacroPlan, userTdeeState, workoutSessions } from '../schema.js';
 import { desc, eq } from 'drizzle-orm';
 
 const router = express.Router();
+
+const CHAD_KNOWLEDGE_SOURCES = (process.env.CHAD_KNOWLEDGE_SOURCES || 'bodyrecomposition,rapid_fat_loss')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
 
 const SYSTEM_PROMPT =
     'You are Chad Bot for LeanIsLaw: direct, sharp, practical coach voice. ' +
@@ -51,6 +62,43 @@ function looksLikeMuscleCalorieQuestion(text) {
         (t.includes('muscle') || t.includes('gain') || t.includes('bulk')) &&
         (t.includes('calorie') || t.includes('tdee') || t.includes('surplus') || t.includes('eat'))
     );
+}
+
+function looksLikeRflProtocolQuestion(text) {
+    const t = String(text || '').toLowerCase();
+    return (
+        /\brfl\b/.test(t) ||
+        /\brapid fat loss\b/.test(t) ||
+        /\bpsmf\b/.test(t) ||
+        /\bprotein.?sparing\b/.test(t) ||
+        /\blyle\b/.test(t) ||
+        /\bmcdonald\b/.test(t) ||
+        (/\bprotocol\b/.test(t) && /\b(fat loss|cut|diet|deficit)\b/.test(t)) ||
+        (/\baggressive\b/.test(t) && /\b(diet|cut|deficit|fat loss)\b/.test(t))
+    );
+}
+
+/** User is asking for macro or calorie numbers (not a generic “give me a plan”). */
+function looksLikeRflMacroCalorieQuestion(text) {
+    const t = String(text || '').toLowerCase();
+    return (
+        /\b(total|daily)\s+(macros?|kcal|calories?)\b/.test(t) ||
+        /\bmacros?\b.*\b(breakdown|fall|land|be|are|numbers?|total)\b/.test(t) ||
+        /\b(where|how)\s+(do\s+)?(the\s+)?macros?\b/.test(t) ||
+        /\b(macro|calorie|caloric)\s+(breakdown|totals?)\b/.test(t) ||
+        /\bhow\s+many\s+(cal|kcal|calories?)\b/.test(t) ||
+        /\bwhat\s+(are|would)\s+(my|the)\s+macros?\b/.test(t) ||
+        /\btell me\s+where\s+the\s+macros?\b/.test(t)
+    );
+}
+
+function primaryTdeeKcalFromState(state) {
+    if (!state) return null;
+    const ema = state.ema_tdee != null ? Number(state.ema_tdee) : NaN;
+    const base = state.baseline_tdee != null ? Number(state.baseline_tdee) : NaN;
+    if (Number.isFinite(ema) && ema >= 800 && ema <= 20000) return Math.round(ema);
+    if (Number.isFinite(base) && base >= 800 && base <= 20000) return Math.round(base);
+    return null;
 }
 
 function stageFromRank(rank) {
@@ -147,15 +195,53 @@ async function getProfileAnswers(userId) {
     return Array.isArray(r.rows?.[0]?.answers) ? r.rows[0].answers : [];
 }
 
+const MAX_IMAGE_B64_CHARS = 14_000_000;
+
 function sanitizeMessages(input) {
     const arr = Array.isArray(input) ? input : [];
     return arr
-        .map((m) => ({
-            role: m?.role === 'assistant' ? 'assistant' : 'user',
-            content: String(m?.content || '').trim(),
-        }))
-        .filter((m) => m.content.length > 0)
+        .map((m) => {
+            const role = m?.role === 'assistant' ? 'assistant' : 'user';
+            const content = String(m?.content ?? '').trim();
+            let image = null;
+            const rawB64 = m?.image_base64;
+            if (typeof rawB64 === 'string' && rawB64.length > 0) {
+                let b64 = rawB64.replace(/^data:image\/\w+;base64,/, '').trim();
+                const mime = String(m?.image_mime || 'image/jpeg').trim() || 'image/jpeg';
+                if (b64.length > MAX_IMAGE_B64_CHARS) b64 = b64.slice(0, MAX_IMAGE_B64_CHARS);
+                if (b64.length > 200) image = { base64: b64, mime };
+            }
+            return { role, content, image };
+        })
+        .filter((m) => m.content.length > 0 || m.image)
         .slice(-20);
+}
+
+function openAiMessageFromTurn(m) {
+    if (m.role === 'assistant') {
+        return { role: 'assistant', content: m.content };
+    }
+    if (m.image) {
+        const text = m.content.length ? m.content : 'What do you think? (photo attached)';
+        const url = `data:${m.image.mime};base64,${m.image.base64}`;
+        return {
+            role: 'user',
+            content: [
+                { type: 'text', text },
+                { type: 'image_url', image_url: { url, detail: 'low' } },
+            ],
+        };
+    }
+    return { role: 'user', content: m.content };
+}
+
+function persistUserLine(lastUserTurn) {
+    if (!lastUserTurn || lastUserTurn.role !== 'user') return '';
+    const base = String(lastUserTurn.content || '').trim();
+    if (lastUserTurn.image) {
+        return base.length ? `${base}\n[image attached]` : '[image attached]';
+    }
+    return base;
 }
 
 function getChadRank(workoutCount) {
@@ -227,11 +313,39 @@ async function userStatsContext(userId) {
               )
             : null;
 
+    const rankLabel = await userRank(userId);
+    const anchorTdee = primaryTdeeKcalFromState(state);
+    const bfStr =
+        weight?.body_fat_pct != null && Number(weight.body_fat_pct) >= 0
+            ? `, latest BF ~${weight.body_fat_pct}%`
+            : '';
+
+    let rflProteinHint = '';
+    if (weight?.weight_kg != null && weight?.body_fat_pct != null) {
+        const wkg = Number(weight.weight_kg);
+        const bf = Number(weight.body_fat_pct);
+        if (Number.isFinite(wkg) && Number.isFinite(bf) && wkg > 0 && bf >= 0 && bf <= 60) {
+            const mult = rflProteinGPerLbLbm(bf);
+            if (mult != null) {
+                const lbmKg = wkg * (1 - bf / 100);
+                const lbmLb = lbmKg * 2.2046226218;
+                const gProt = Math.round(lbmLb * mult);
+                rflProteinHint =
+                    `- RFL protein (latest metrics, book-style): LBM ~${lbmLb.toFixed(1)} lb @ ~${bf}% BF → ~${mult} g/lb LBM ≈ **${gProt} g protein/day** (exact lines must match retrieved [rapid_fat_loss] text).\n`;
+            }
+        }
+    } else if (weight?.weight_kg != null) {
+        rflProteinHint =
+            `- RFL: log **body fat %** (or known LBM) to set protein from g/lb LBM — weight alone is not enough.\n`;
+    }
+
     return (
+        `ANCHOR — maintenance TDEE (context for cuts; for RFL, protein-from-LBM rules still drive setup): ${anchorTdee != null ? `${anchorTdee} kcal/day` : 'unknown (no TDEE row — ask them to finish TDEE setup)'}. (ema_tdee when present, else baseline_tdee.)\n` +
         `User app stats snapshot:\n` +
-        `- Rank: ${getChadRank(sessions.length)}\n` +
+        `- Rank: ${rankLabel}\n` +
         `- Workouts in last 7d: ${recentWorkoutCount}\n` +
-        `- Latest weight: ${weight?.weight_kg != null ? `${weight.weight_kg} kg` : 'unknown'}\n` +
+        `- Latest weight: ${weight?.weight_kg != null ? `${weight.weight_kg} kg` : 'unknown'}${bfStr}\n` +
+        (rflProteinHint ? `${rflProteinHint}` : '') +
         `- Latest log day: ${lastLog?.date || 'none'} (cals: ${lastLog?.calories ?? '—'}, steps: ${lastLog?.steps ?? '—'})\n` +
         `- Avg daily calories (last ${recentLogs.length} logs): ${avgCals7 ?? '—'}\n` +
         `- Avg daily steps (last ${recentLogs.length} logs): ${avgSteps7 ?? '—'}\n` +
@@ -256,8 +370,27 @@ router.get('/training/questions', requireAuth, requireCoach, async (_req, res) =
 
 router.get('/knowledge/status', requireAuth, async (_req, res) => {
     try {
-        const count = await knowledgeCount('bodyrecomposition');
-        res.json({ source: 'bodyrecomposition', chunks: count });
+        const chunksBySource = await knowledgeCountsBySource(CHAD_KNOWLEDGE_SOURCES);
+        const emb = await pool.query(
+            `SELECT source,
+                    COUNT(*)::int AS chunks,
+                    COUNT(*) FILTER (WHERE embedding IS NOT NULL)::int AS embedded
+             FROM knowledge_chunks
+             WHERE source = ANY($1::text[])
+             GROUP BY source`,
+            [CHAD_KNOWLEDGE_SOURCES]
+        );
+        const embeddingsBySource = {};
+        for (const row of emb.rows) {
+            embeddingsBySource[row.source] = { chunks: row.chunks, embedded: row.embedded };
+        }
+        res.json({
+            sources: CHAD_KNOWLEDGE_SOURCES,
+            chunksBySource,
+            embeddingsBySource,
+            semanticRetrievalEnabled:
+                process.env.CHAD_USE_SEMANTIC_KNOWLEDGE !== 'false' && Boolean(process.env.OPENAI_API_KEY),
+        });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -270,6 +403,40 @@ router.get('/training', requireAuth, requireCoach, async (req, res) => {
         res.json({ answers });
     } catch (err) {
         res.status(500).json({ error: err.message });
+    }
+});
+
+/** Persist chat lines without calling the model (e.g. game results). */
+router.post('/append', requireAuth, async (req, res) => {
+    try {
+        const userId = Number(req.userId);
+        const raw = req.body?.messages;
+        if (!Array.isArray(raw) || raw.length === 0) {
+            return res.status(400).json({ error: 'messages array is required' });
+        }
+        const slice = raw.slice(0, 10);
+        const messages = slice
+            .map((m) => {
+                const role = m?.role === 'assistant' ? 'assistant' : 'user';
+                const content = String(m?.content ?? '').trim().slice(0, 100_000);
+                return { role, content };
+            })
+            .filter((m) => m.content.length > 0);
+        if (!messages.length) {
+            return res.status(400).json({ error: 'no valid messages' });
+        }
+        await ensureChatHistoryTable();
+        for (const m of messages) {
+            await pool.query(`INSERT INTO chat_messages (user_id, role, content) VALUES ($1, $2, $3)`, [
+                userId,
+                m.role,
+                m.content,
+            ]);
+        }
+        return res.json({ ok: true, count: messages.length });
+    } catch (err) {
+        console.error('chat append error:', err);
+        return res.status(500).json({ error: err.message });
     }
 });
 
@@ -329,10 +496,20 @@ router.post('/', requireAuth, async (req, res) => {
         if (!messages.length) {
             return res.status(400).json({ error: 'messages are required' });
         }
-        const latestUser = [...messages].reverse().find((m) => m.role === 'user')?.content || '';
+        const lastUserTurn = [...messages].reverse().find((m) => m.role === 'user');
+        const latestUser =
+            (lastUserTurn?.content && String(lastUserTurn.content).trim()) ||
+            (lastUserTurn?.image ? '(user sent a photo)' : '');
         const rank = await userRank(userId);
         const statsContext = await userStatsContext(userId);
-        const recentText = messages.map((m) => m.content).join('\n');
+        const recentText = messages
+            .map((m) => m.content || (m.image ? '[photo]' : ''))
+            .filter(Boolean)
+            .join('\n');
+        const isRflQ = looksLikeRflProtocolQuestion(recentText);
+        const knowledgeQueryText = isRflQ
+            ? `${recentText}\nRFL rapid fat loss PSMF protein sparing modified diet no cardio lean body mass gram per pound LBM vegetables trace fat refeed fish oil EPA DHA 2.5g multivitamin electrolytes sodium potassium magnesium`
+            : recentText;
         const isMuscleCalQ = looksLikeMuscleCalorieQuestion(latestUser);
         let modelSpecificCalorieRule = '';
         if (isMuscleCalQ) {
@@ -346,8 +523,14 @@ router.post('/', requireAuth, async (req, res) => {
                     `Do not output +600/day by default.`;
             }
         }
+        const rflCalorieRule = isRflQ ? rflBookFaithfulContext() : '';
+        const rflMacroDetailQ = isRflQ && looksLikeRflMacroCalorieQuestion(latestUser);
+        const rflMacroAnswerBoost = rflMacroDetailQ
+            ? `\nRFL — **this turn is a macro/kcal question:** **Protein g + protein kcal** first (from hint). **No “aim for X g fat”** — RFL has **no fat macro target**, only **trace** from lean protein + supps; **no meaningful carb target** — **barely incidental** from fibrous veg, not a carb line to optimize. Give **~total kcal** as mostly protein plus **small incidentals** described in words (not a 3-macro grid). **Supps:** ~**2.5 g/day EPA+DHA** (labels), **multi**, **electrolytes**. Sound human; no meal-plan rehash.\n`
+            : '';
         const profileAnswers = await getProfileAnswers(userId);
-        const retrieved = await searchKnowledge(recentText, 'bodyrecomposition', 4);
+        const principlesContext = chadCorePrinciplesContext();
+        const retrieved = await searchKnowledge(knowledgeQueryText, CHAD_KNOWLEDGE_SOURCES, isRflQ ? 10 : 8);
         const glossaryHits = glossaryMatchesFromText(recentText).slice(0, 12);
         const glossaryContext =
             glossaryHits.length > 0
@@ -367,17 +550,18 @@ router.post('/', requireAuth, async (req, res) => {
                 : 'Coach profile not trained yet.';
         const knowledgeContext =
             retrieved.length > 0
-                ? `Knowledge snippets from bodyrecomposition.com:\n${retrieved
+                ? `Knowledge snippets (retrieved via keyword + semantic match when embeddings exist; source in brackets):\n${retrieved
                       .map(
                           (k, i) =>
-                              `[${i + 1}] ${k.title} (${k.url})\n${String(k.chunk_text).slice(0, 900)}`
+                              `[${i + 1}] [${k.source}] ${k.title} (${k.url})\n${String(k.chunk_text).slice(0, 900)}`
                       )
                       .join('\n\n')}`
-                : 'No external knowledge snippets matched.';
+                : 'No knowledge snippets matched for this message.';
 
+        const openAiTurns = messages.map(openAiMessageFromTurn);
         const payload = {
             model,
-            temperature: 0.4,
+            temperature: isRflQ ? 0.28 : 0.4,
             messages: [
                 {
                     role: 'system',
@@ -393,14 +577,17 @@ router.post('/', requireAuth, async (req, res) => {
 - If user rank is below CHAD and they call you "lil bro", check them and keep authority.
 - If asked "do you mog me", answer in-character based on rank first, then give one practical next action.
 - Prefer concrete actions over generic lists.
-- If giving a plan, max 4 bullets.
+- If giving a plan, max 4 bullets (macro/kcal-only follow-ups can be a short paragraph instead).
+- You may wrap short emphasis phrases in **double asterisks**; the app shows those as bold. Do not use other markdown (lists are fine as plain lines with numbers or hyphens).
 - Use "Later Gator." ONLY when the user is clearly ending the conversation; otherwise never include it.
-- If referencing Lyle/bodyrecomposition content, do not invent numbers not present in retrieved snippets. If uncertain, say the specific value is not shown in current sources.
+- If core principles are listed above retrieved snippets, treat them as standing rules; snippets add numbers and specifics.
+- If referencing retrieved knowledge snippets, do not invent numbers not present there. If uncertain, say the value is not in the current snippets.
 - Never default to generic muscle-gain surplus ranges (e.g. +300 to +500) unless the retrieved source explicitly states that range.
 - For muscle-gain calorie questions, stay source-faithful and emphasize that required surplus may be smaller than people think when that appears in sources.
-Do not moralize; keep it practical.\n\n${glossaryContext}\n\n${profileContext}\n\n${loreSystemContext()}\n\n${knowledgeContext}\n\n${statsContext}\n\n${modelSpecificCalorieRule}`,
+- For RFL/PSMF / rapid fat loss: follow the **RFL book-faithful constraints** block when present (LBM-based protein; **no cardio**; **supplement stack** — EPA+DHA ~2.5 g/day combined from fish oil labels, multivitamin, electrolytes; not “percentage deficit” as the main definition). TDEE in stats is context, not a replacement for that structure.
+Do not moralize; keep it practical.\n\n${principlesContext ? `${principlesContext}\n\n` : ''}${glossaryContext}\n\n${profileContext}\n\n${loreSystemContext()}\n\n${knowledgeContext}\n\n${statsContext}\n\n${rflCalorieRule}${rflMacroAnswerBoost}\n\n${modelSpecificCalorieRule}`,
                 },
-                ...messages,
+                ...openAiTurns,
             ],
         };
 
@@ -467,12 +654,70 @@ Do not moralize; keep it practical.\n\n${glossaryContext}\n\n${profileContext}\n
                 // keep prior draft if rewrite fails
             }
         }
+
+        if (isRflQ) {
+            const cardioSlip =
+                /\b(hiit|high[- ]intensity|steady[- ]state)\b/i.test(text) ||
+                (/\bcardio\b/i.test(text) &&
+                    /\b(2|3|two|three|times|×|x|sessions?|per week|\/week|days?\s*a\s*week)\b/i.test(text));
+            const cardioOk =
+                /\b(no cardio|without cardio|avoid cardio|skip cardio|don'?t do cardio|no extra cardio)\b/i.test(text);
+            if (cardioSlip && !cardioOk) {
+                try {
+                    text = await callOpenAiChat(apiKey, {
+                        model,
+                        temperature: 0.15,
+                        messages: [
+                            {
+                                role: 'system',
+                                content:
+                                    'Rewrite shorter in the same blunt Chad voice. RFL: remove HIIT, steady-state, and extra cardio blocks — standard book framing is **no cardio**. Keep protein-from-LBM setup, fibrous veggies. Do not reintroduce cardio.',
+                            },
+                            { role: 'user', content: text },
+                        ],
+                    });
+                } catch {
+                    /* keep draft */
+                }
+            }
+
+            if (rflReplyLooksGenericDeficit(text)) {
+                try {
+                    text = await callOpenAiChat(apiKey, {
+                        model,
+                        temperature: 0.15,
+                        messages: [
+                            {
+                                role: 'system',
+                                content:
+                                    'Rewrite the reply in the same blunt Chad voice. Max 4 short bullets/lines. ' +
+                                    'RFL / PSMF book setup: **Lead with protein from LBM × g/lb** (use user stats RFL protein hint if present; else say you need **weight + body-fat %** or known LBM — no guessing, no default “150 g”). ' +
+                                    '**Macros:** **no prescribed fat grams** (no 25–50 g “targets”) — **trace only**; **no carb macro to hit** — near-zero intentional carbs. Carbs = **incidental from veg**, not 30–60 g planned. Not 100–150 g starches. ' +
+                                    '**Food:** lean protein + fibrous vegetables; **do not** suggest bread, toast, grains, rice, pasta, oats as routine meals. ' +
+                                    '**Supplements (required):** ~**2.5 g/day combined EPA+DHA** (fish oil label), **multivitamin**, **electrolytes** per book/snippets — not “consider fish oil.” ' +
+                                    '**No cardio.** Do **not** center the plan on a **calorie number range** or “% below maintenance.” Match snippet numbers.',
+                            },
+                            {
+                                role: 'user',
+                                content:
+                                    `Stats block (for protein hint / missing data):\n${statsContext}\n\n` +
+                                    `Draft to fix:\n${text}`,
+                            },
+                        ],
+                    });
+                } catch {
+                    /* keep draft */
+                }
+            }
+        }
+
         const reply = normalizeSignoff(text, isConversationEnding(latestUser));
         await ensureChatHistoryTable();
+        const userPersist = persistUserLine(lastUserTurn);
         await pool.query(
             `INSERT INTO chat_messages (user_id, role, content)
              VALUES ($1, 'user', $2), ($1, 'assistant', $3)`,
-            [userId, latestUser, reply]
+            [userId, userPersist, reply]
         );
         return res.json({ reply });
     } catch (err) {

@@ -1,0 +1,7 @@
+Copy to backend/knowledge/chad-core-principles.txt (gitignored) with your own bullets. This block is always injected into Chad’s system prompt.
+
+- Principle one (how you want aggressive cuts framed).
+- Principle two (non‑negotiable safety checks before recommending PSMF-style phases).
+- Principle three (how refeeds / breaks fit your framework).
+
+Keep it under ~2–4 short paragraphs so the model still has room for retrieved book snippets.

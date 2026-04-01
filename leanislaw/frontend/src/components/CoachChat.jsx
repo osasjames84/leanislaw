@@ -1,16 +1,136 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { authBearerHeaders } from "../apiHeaders";
 import ChadPhoto from "../assets/creator_photo.png";
 import Sub5Image from "../assets/sub5.png";
+import AnagramGame from "./AnagramGame";
+import AnagramVictoryCard from "./AnagramVictoryCard";
+
+const ANAGRAM_MSG_PREFIX = "[anagram:v1]";
+
+function parseAnagramPayload(content) {
+    const s = String(content ?? "");
+    if (!s.startsWith(ANAGRAM_MSG_PREFIX)) return null;
+    try {
+        return JSON.parse(s.slice(ANAGRAM_MSG_PREFIX.length));
+    } catch {
+        return null;
+    }
+}
+
+function contentForChatApi(content) {
+    const s = String(content ?? "");
+    if (!s.startsWith(ANAGRAM_MSG_PREFIX)) return s;
+    try {
+        const d = JSON.parse(s.slice(ANAGRAM_MSG_PREFIX.length));
+        const side = d.won ? "You beat Chad" : "Chad won";
+        return `[Anagrams] ${side} (${d.youPts ?? 0}–${d.chadPts ?? 0}).`;
+    } catch {
+        return "[Anagrams] Match finished.";
+    }
+}
+
+/** iMessage-style mini-apps: prompt games fill the composer; Anagrams opens the mini-game. */
+const CHAD_GAMES = [
+    { id: "roast", label: "Roast mode", emoji: "🔥", playable: false, prompt: "Roast my worst gym habit in one paragraph — funny, not soft." },
+    {
+        id: "wyr",
+        label: "Would you rather",
+        emoji: "⚖️",
+        playable: false,
+        prompt: "Would you rather lose 5% on bench in 8 weeks or skip leg day for a month? Pick for me and justify it.",
+    },
+    { id: "anagrams", label: "Anagrams", emoji: "🔤", playable: true },
+];
+
+/** Turn `**like this**` into real bold (OpenAI-style emphasis). */
+function renderWithBold(text) {
+    const s = String(text ?? "");
+    const nodes = [];
+    let i = 0;
+    let k = 0;
+    while (i < s.length) {
+        const open = s.indexOf("**", i);
+        if (open === -1) {
+            if (i < s.length) nodes.push(<span key={`t${k++}`}>{s.slice(i)}</span>);
+            break;
+        }
+        if (open > i) {
+            nodes.push(<span key={`t${k++}`}>{s.slice(i, open)}</span>);
+        }
+        const close = s.indexOf("**", open + 2);
+        if (close === -1) {
+            nodes.push(<span key={`t${k++}`}>{s.slice(open)}</span>);
+            break;
+        }
+        nodes.push(
+            <strong key={`b${k++}`} style={{ fontWeight: 800 }}>
+                {s.slice(open + 2, close)}
+            </strong>
+        );
+        i = close + 2;
+    }
+    return <>{nodes}</>;
+}
+
+async function compressImageFile(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            const img = new Image();
+            img.onload = () => {
+                const maxW = 1280;
+                let w = img.width;
+                let h = img.height;
+                if (w > maxW) {
+                    h = (h * maxW) / w;
+                    w = maxW;
+                }
+                const canvas = document.createElement("canvas");
+                canvas.width = Math.max(1, Math.round(w));
+                canvas.height = Math.max(1, Math.round(h));
+                const ctx = canvas.getContext("2d");
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
+                const m = /^data:([^;]+);base64,(.*)$/.exec(dataUrl);
+                if (!m) {
+                    reject(new Error("compress failed"));
+                    return;
+                }
+                resolve({ dataUrl, base64: m[2], mime: m[1] });
+            };
+            img.onerror = () => reject(new Error("image load failed"));
+            img.src = reader.result;
+        };
+        reader.onerror = () => reject(new Error("read failed"));
+        reader.readAsDataURL(file);
+    });
+}
+
+function messagesToApiPayload(msgs) {
+    return msgs.map((m) => {
+        const base = { role: m.role, content: contentForChatApi(m.content) };
+        if (m.role === "user" && m.imageBase64) {
+            return { ...base, image_base64: m.imageBase64, image_mime: m.imageMime || "image/jpeg" };
+        }
+        return base;
+    });
+}
 
 const CoachChat = () => {
     const navigate = useNavigate();
     const { token } = useAuth();
+    const fileInputRef = useRef(null);
+    const cameraInputRef = useRef(null);
+    const inputRef = useRef(null);
+
     const [input, setInput] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+    const [attachOpen, setAttachOpen] = useState(false);
+    const [pendingImage, setPendingImage] = useState(null);
+    const [anagramOpen, setAnagramOpen] = useState(false);
     const [messages, setMessages] = useState([
         {
             role: "assistant",
@@ -19,8 +139,8 @@ const CoachChat = () => {
     ]);
 
     const canSend = useMemo(
-        () => Boolean(token && input.trim().length > 0 && !loading),
-        [token, input, loading]
+        () => Boolean(token && (input.trim().length > 0 || pendingImage) && !loading),
+        [token, input, pendingImage, loading]
     );
 
     useEffect(() => {
@@ -39,30 +159,58 @@ const CoachChat = () => {
                           .filter((m) => m.content.length > 0)
                     : [];
                 if (history.length) {
-                    setMessages(history);
+                    setMessages(
+                        history.map((row) => ({
+                            role: row.role,
+                            content: row.content,
+                            ...(row.created_at ? { created_at: row.created_at } : {}),
+                        }))
+                    );
                 }
             })
             .catch(() => {});
     }, [token]);
 
-    const send = async (e) => {
-        e?.preventDefault?.();
-        if (!canSend) return;
-        const nextUser = { role: "user", content: input.trim() };
-        const nextMsgs = [...messages, nextUser];
-        setMessages(nextMsgs);
-        setInput("");
+    const pickPhoto = () => {
+        setAttachOpen(false);
+        fileInputRef.current?.click();
+    };
+
+    const pickCamera = () => {
+        setAttachOpen(false);
+        cameraInputRef.current?.click();
+    };
+
+    const onFileChange = async (e) => {
+        const file = e.target.files?.[0];
+        e.target.value = "";
+        if (!file || !file.type.startsWith("image/")) return;
+        try {
+            const compressed = await compressImageFile(file);
+            setPendingImage(compressed);
+        } catch {
+            setError("Couldn’t use that photo — try another.");
+        }
+    };
+
+    const chooseGame = (prompt) => {
+        setInput(prompt);
+        setAttachOpen(false);
+        inputRef.current?.focus();
+    };
+
+    const pushUserAndFetch = async (nextMsgs) => {
         setLoading(true);
         setError("");
         try {
             const res = await fetch("/api/v1/chat", {
                 method: "POST",
                 headers: { ...authBearerHeaders(token), "Content-Type": "application/json" },
-                body: JSON.stringify({ messages: nextMsgs }),
+                body: JSON.stringify({ messages: messagesToApiPayload(nextMsgs) }),
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(data.error || "Chat failed");
-            setMessages((prev) => [...prev, { role: "assistant", content: data.reply || "..." }]);
+            setMessages([...nextMsgs, { role: "assistant", content: data.reply || "..." }]);
         } catch (err) {
             setError(err.message);
         } finally {
@@ -70,8 +218,92 @@ const CoachChat = () => {
         }
     };
 
+    const send = async (e) => {
+        e?.preventDefault?.();
+        if (!canSend) return;
+        const caption = input.trim();
+        const text = caption || (pendingImage ? "Sent a photo." : "");
+        const nextUser = {
+            role: "user",
+            content: text,
+            ...(pendingImage
+                ? {
+                      imagePreview: pendingImage.dataUrl,
+                      imageBase64: pendingImage.base64,
+                      imageMime: pendingImage.mime,
+                  }
+                : {}),
+        };
+        const nextMsgs = [...messages, nextUser];
+        setMessages(nextMsgs);
+        setInput("");
+        setPendingImage(null);
+        await pushUserAndFetch(nextMsgs);
+    };
+
+    const handleAnagramComplete = async (payload) => {
+        if (!token) return;
+        setAnagramOpen(false);
+        const body = {
+            v: 1,
+            won: payload.won,
+            youPts: payload.youPoints,
+            chadPts: payload.chadPoints,
+            youWords: payload.yourWords?.length ?? 0,
+            chadWords: payload.chadWords?.length ?? 0,
+            quote: payload.chadLine,
+            taunts: payload.tauntCount ?? 0,
+        };
+        const content = `${ANAGRAM_MSG_PREFIX}${JSON.stringify(body)}`;
+        const cardMsg = { role: "assistant", content };
+        setMessages((prev) => [...prev, cardMsg]);
+        try {
+            const raw = localStorage.getItem("leanislaw_anagram_stats");
+            const prevStats = raw ? JSON.parse(raw) : {};
+            const bestScore = Math.max(Number(prevStats.bestScore) || 0, Number(payload.youPoints) || 0);
+            const wins = Number(prevStats.wins) || 0;
+            const losses = Number(prevStats.losses) || 0;
+            localStorage.setItem(
+                "leanislaw_anagram_stats",
+                JSON.stringify({
+                    bestScore,
+                    wins: wins + (payload.won ? 1 : 0),
+                    losses: losses + (payload.won ? 0 : 1),
+                    lastMatch: {
+                        at: Date.now(),
+                        won: payload.won,
+                        youPoints: payload.youPoints,
+                        chadPoints: payload.chadPoints,
+                        tauntCount: payload.tauntCount ?? 0,
+                    },
+                })
+            );
+        } catch {
+            /* ignore */
+        }
+        try {
+            await fetch("/api/v1/chat/append", {
+                method: "POST",
+                headers: { ...authBearerHeaders(token), "Content-Type": "application/json" },
+                body: JSON.stringify({ messages: [{ role: "assistant", content }] }),
+            });
+        } catch {
+            /* offline: still in UI */
+        }
+    };
+
     return (
         <div style={page}>
+            <input ref={fileInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={onFileChange} />
+            <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                style={{ display: "none" }}
+                onChange={onFileChange}
+            />
+
             <header style={header}>
                 <button type="button" style={backBtn} onClick={() => navigate("/dashboard")}>
                     ← Home
@@ -80,44 +312,122 @@ const CoachChat = () => {
                 <span style={headerSpacer} aria-hidden />
             </header>
 
+            {anagramOpen ? (
+                <AnagramGame onClose={() => setAnagramOpen(false)} onGameComplete={handleAnagramComplete} />
+            ) : null}
+
             <div style={chatWrap}>
-                {messages.map((m, i) => (
-                    <div
-                        key={`${m.role}-${i}`}
-                        style={{
-                            ...msgRow,
-                            ...(m.role === "user" ? msgRowUser : msgRowAssistant),
-                        }}
-                    >
-                        {m.role === "assistant" ? (
-                            <img src={ChadPhoto} alt="Chad Bot" style={avatar} />
-                        ) : null}
+                {messages.map((m, i) => {
+                    const anagram = parseAnagramPayload(m.content);
+                    return (
                         <div
+                            key={`${m.role}-${i}`}
                             style={{
-                                ...bubble,
-                                ...(m.role === "user" ? bubbleUser : bubbleAssistant),
+                                ...msgRow,
+                                ...(m.role === "user" ? msgRowUser : msgRowAssistant),
                             }}
                         >
-                            {m.content}
+                            {m.role === "assistant" ? (
+                                <img src={ChadPhoto} alt="Chad Bot" style={avatar} />
+                            ) : null}
+                            <div
+                                style={{
+                                    ...bubble,
+                                    ...(m.role === "user" ? bubbleUser : bubbleAssistant),
+                                }}
+                            >
+                                {m.imagePreview ? (
+                                    <img src={m.imagePreview} alt="" style={bubbleImage} />
+                                ) : null}
+                                {anagram ? (
+                                    <AnagramVictoryCard
+                                        won={Boolean(anagram.won)}
+                                        youPts={Number(anagram.youPts) || 0}
+                                        chadPts={Number(anagram.chadPts) || 0}
+                                        quote={String(anagram.quote || "")}
+                                    />
+                                ) : m.content ? (
+                                    <div>{renderWithBold(m.content)}</div>
+                                ) : null}
+                            </div>
+                            {m.role === "user" ? <img src={Sub5Image} alt="Sub-5" style={avatar} /> : null}
                         </div>
-                        {m.role === "user" ? <img src={Sub5Image} alt="Sub-5" style={avatar} /> : null}
-                    </div>
-                ))}
+                    );
+                })}
                 {loading ? <div style={typing}>Chad is typing…</div> : null}
                 {error ? <div style={err}>{error}</div> : null}
             </div>
 
-            <form onSubmit={send} style={composer}>
-                <input
-                    style={inputStyle}
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    placeholder="Ask Chad Bot…"
-                />
-                <button type="submit" style={{ ...sendBtn, opacity: canSend ? 1 : 0.55 }} disabled={!canSend}>
-                    Send
-                </button>
-            </form>
+            {attachOpen ? (
+                <button type="button" style={sheetBackdrop} aria-label="Close menu" onClick={() => setAttachOpen(false)} />
+            ) : null}
+
+            <div style={composerOuter}>
+                {attachOpen ? (
+                    <div style={attachSheet}>
+                        <div style={sheetTitle}>More</div>
+                        <div style={actionsRow}>
+                            <button type="button" style={actionTile} onClick={pickPhoto}>
+                                <span style={actionEmoji}>🖼️</span>
+                                <span style={actionLabel}>Photos</span>
+                            </button>
+                            <button type="button" style={actionTile} onClick={pickCamera}>
+                                <span style={actionEmoji}>📷</span>
+                                <span style={actionLabel}>Camera</span>
+                            </button>
+                        </div>
+                        <div style={gamesHeader}>Games</div>
+                        <div style={gamesGrid}>
+                            {CHAD_GAMES.map((g) => (
+                                <button
+                                    key={g.id}
+                                    type="button"
+                                    style={gameTile}
+                                    onClick={() => {
+                                        setAttachOpen(false);
+                                        if (g.playable) setAnagramOpen(true);
+                                        else chooseGame(g.prompt);
+                                    }}
+                                >
+                                    <span style={gameEmoji}>{g.emoji}</span>
+                                    <span style={gameLabel}>{g.label}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                ) : null}
+
+                {pendingImage ? (
+                    <div style={pendingRow}>
+                        <img src={pendingImage.dataUrl} alt="" style={pendingThumb} />
+                        <button type="button" style={pendingRemove} onClick={() => setPendingImage(null)}>
+                            Remove
+                        </button>
+                    </div>
+                ) : null}
+
+                <form onSubmit={send} style={composer}>
+                    <button
+                        type="button"
+                        style={{ ...plusBtn, ...(attachOpen ? plusBtnActive : {}) }}
+                        aria-expanded={attachOpen}
+                        aria-label="Add photos or games"
+                        onClick={() => setAttachOpen((o) => !o)}
+                    >
+                        +
+                    </button>
+                    <input
+                        ref={inputRef}
+                        style={inputStyle}
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        placeholder="Ask Chad Bot…"
+                    />
+                    <button type="submit" style={{ ...sendBtn, opacity: canSend ? 1 : 0.55 }} disabled={!canSend}>
+                        Send
+                    </button>
+                </form>
+            </div>
         </div>
     );
 };
@@ -187,17 +497,168 @@ const bubble = {
 };
 const bubbleAssistant = { alignSelf: "flex-start", background: "#fff", border: "1px solid #e5e5ea" };
 const bubbleUser = { alignSelf: "flex-end", background: "#007aff", color: "#fff" };
+const bubbleImage = {
+    display: "block",
+    maxWidth: "100%",
+    maxHeight: 200,
+    borderRadius: 12,
+    marginBottom: 8,
+    objectFit: "cover",
+};
 const typing = { fontSize: "0.78rem", color: "#8e8e93", marginTop: 4 };
 const err = { fontSize: "0.82rem", color: "#b45309", background: "#fff8eb", padding: "8px 10px", borderRadius: 10 };
-const composer = {
+
+const sheetBackdrop = {
+    position: "fixed",
+    inset: 0,
+    zIndex: 40,
+    border: "none",
+    padding: 0,
+    margin: 0,
+    background: "rgba(0,0,0,0.22)",
+    cursor: "default",
+};
+
+const composerOuter = {
     flexShrink: 0,
-    // Keep input bar above fixed bottom nav.
-    padding: "10px 12px calc(74px + env(safe-area-inset-bottom, 0px))",
+    position: "relative",
+    zIndex: 50,
+    padding: "0 12px calc(74px + env(safe-area-inset-bottom, 0px))",
     borderTop: "0.5px solid #d1d1d6",
     background: "rgba(255,255,255,0.94)",
+};
+
+const attachSheet = {
+    position: "absolute",
+    bottom: "100%",
+    left: 0,
+    right: 0,
+    marginBottom: 8,
+    background: "#fff",
+    borderRadius: 16,
+    boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
+    border: "0.5px solid #e5e5ea",
+    padding: "14px 14px 12px",
+    maxHeight: "min(52vh, 420px)",
+    overflowY: "auto",
+};
+
+const sheetTitle = {
+    fontSize: "0.72rem",
+    fontWeight: "700",
+    color: "#8e8e93",
+    textTransform: "uppercase",
+    letterSpacing: "0.04em",
+    marginBottom: 10,
+};
+
+const actionsRow = {
+    display: "flex",
+    gap: 10,
+    marginBottom: 16,
+};
+
+const actionTile = {
+    flex: 1,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 6,
+    padding: "14px 8px",
+    borderRadius: 14,
+    border: "none",
+    background: "#f2f2f7",
+    cursor: "pointer",
+};
+
+const actionEmoji = { fontSize: "1.75rem", lineHeight: 1 };
+const actionLabel = { fontSize: "0.8rem", fontWeight: "650", color: "#1c1c1e" };
+
+const gamesHeader = {
+    fontSize: "0.72rem",
+    fontWeight: "700",
+    color: "#8e8e93",
+    textTransform: "uppercase",
+    letterSpacing: "0.04em",
+    marginBottom: 10,
+};
+
+const gamesGrid = {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, 1fr)",
+    gap: 10,
+};
+
+const gameTile = {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 6,
+    padding: "12px 6px",
+    borderRadius: 14,
+    border: "none",
+    background: "#f2f2f7",
+    cursor: "pointer",
+};
+
+const gameEmoji = { fontSize: "1.5rem", lineHeight: 1 };
+const gameLabel = { fontSize: "0.68rem", fontWeight: "650", color: "#1c1c1e", textAlign: "center" };
+
+const pendingRow = {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    padding: "8px 0 6px",
+};
+
+const pendingThumb = {
+    width: 48,
+    height: 48,
+    borderRadius: 10,
+    objectFit: "cover",
+    border: "1px solid #d1d1d6",
+};
+
+const pendingRemove = {
+    border: "none",
+    background: "none",
+    color: "#ff3b30",
+    fontWeight: "600",
+    fontSize: "0.85rem",
+    cursor: "pointer",
+};
+
+const composer = {
     display: "flex",
     gap: 8,
+    alignItems: "center",
+    paddingTop: 6,
 };
+
+const plusBtn = {
+    width: 36,
+    height: 36,
+    flexShrink: 0,
+    borderRadius: "50%",
+    border: "1px solid #c7c7cc",
+    background: "#e5e5ea",
+    color: "#1c1c1e",
+    fontSize: "1.35rem",
+    fontWeight: "400",
+    lineHeight: 1,
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 0,
+    paddingBottom: 2,
+};
+
+const plusBtnActive = {
+    background: "#d1d1d6",
+    transform: "rotate(45deg)",
+};
+
 const inputStyle = {
     flex: 1,
     border: "1px solid #d1d1d6",

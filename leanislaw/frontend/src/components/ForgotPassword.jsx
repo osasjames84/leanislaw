@@ -31,7 +31,14 @@ const ForgotPassword = () => {
                 return;
             }
             setStep(2);
-            setInfo(data.message || "If an account exists for that email, we sent a reset code.");
+            if (data.devResetCode) {
+                setCode(String(data.devResetCode).replace(/\D/g, "").slice(0, 6));
+                setInfo(
+                    "Dev mode: use the code below (email was not sent — configure RESEND_API_KEY on the server to send real mail)."
+                );
+            } else {
+                setInfo(data.message || "If an account exists for that email, we sent a reset code.");
+            }
         } catch {
             setError("Network error.");
         } finally {
