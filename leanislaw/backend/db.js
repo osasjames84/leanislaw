@@ -6,7 +6,10 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import * as schema from './schema.js';
 
-const { Pool } = pkg;
+const { Pool, types } = pkg;
+// Keep Postgres DATE as plain YYYY-MM-DD strings. Parsing to JS Date + ISO formatting
+// shifts the calendar day in some time zones and breaks date-key maps (e.g. dashboard-trend).
+types.setTypeParser(1082, (val) => val);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

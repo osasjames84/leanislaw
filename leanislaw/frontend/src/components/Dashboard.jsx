@@ -1,7 +1,27 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
+import { authBearerHeaders } from "../apiHeaders";
+
+const ALLOW_REPEAT_TDEE =
+  typeof import.meta !== "undefined" && import.meta.env?.VITE_ALLOW_TDEE_REPEAT === "true";
+import { useUnits } from "../contexts/UnitsContext";
 // Ensure you have your enhanced photo saved in your assets folder!
 import CreatorPhoto from "../assets/creator_photo.png"; 
+import Sub5Image from "../assets/sub5.png";
+import DashboardInsights from "./DashboardInsights";
+
+// Simple rank helper based on total logged workouts
+const getChadRank = (workoutCount) => {
+  if (workoutCount === 0) return "SUBHUMAN";
+  if (workoutCount < 5) return "SUB-5";
+  if (workoutCount < 50) return "LTN";
+  if (workoutCount < 100) return "MTN";
+  if (workoutCount < 200) return "HTN";
+  if (workoutCount < 300) return "CHAD LITE";
+  if (workoutCount >= 300) return "CHAD";
+  return "SUB-5";
+};
 
 const Dashboard = () => {
   const [templates, setTemplates] = useState([]);
@@ -10,26 +30,53 @@ const Dashboard = () => {
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [templateExercises, setTemplateExercises] = useState([]);
   const [showPreview, setShowPreview] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const navigate = useNavigate();
+  const { logout, user, loading: authLoading, token } = useAuth();
+  const { units, setUnits, foodUnit, setFoodUnit } = useUnits();
 
   useEffect(() => {
-    fetch('/api/v1/workoutSessions?is_template=true')
-      .then(res => res.json())
-      .then(data => setTemplates(Array.isArray(data) ? data : []))
+    if (!authLoading && user && user.tdee_onboarding_done === false) {
+      navigate("/setup/tdee", { replace: true });
+    }
+  }, [authLoading, user, navigate]);
+
+  const handleLogout = () => {
+    setSettingsOpen(false);
+    logout();
+    navigate("/login", { replace: true });
+  };
+
+  useEffect(() => {
+    if (!token) {
+      setTemplates([]);
+      setHistory([]);
+      return;
+    }
+    const headers = authBearerHeaders(token);
+
+    fetch('/api/v1/workoutSessions?is_template=true', { headers })
+      .then((res) => res.json())
+      .then((data) => setTemplates(Array.isArray(data) ? data : []))
       .catch(() => setTemplates([]));
 
-    fetch('/api/v1/workoutSessions?is_template=false')
-      .then(res => res.json())
-      .then(data => setHistory(Array.isArray(data) ? data : []))
+    fetch('/api/v1/workoutSessions', { headers })
+      .then((res) => res.json())
+      .then((data) => setHistory(Array.isArray(data) ? data : []))
       .catch(() => setHistory([]));
-  }, []);
+  }, [token]);
+
+  const workoutCount = history.length;
+  const currentRank = getChadRank(workoutCount);
 
   const handleOpenPreview = async (template) => {
     setSelectedTemplate(template);
     setShowPreview(true);
     try {
-      const res = await fetch(`/api/v1/workoutSessions/${template.id}/exerciseLogs`);
+      const res = await fetch(`/api/v1/workoutSessions/${template.id}/exerciseLogs`, {
+        headers: authBearerHeaders(token),
+      });
       const data = await res.json();
       setTemplateExercises(data);
     } catch (err) {
@@ -40,32 +87,132 @@ const Dashboard = () => {
   return (
     <div style={containerStyle}>
       {/* --- SLEEK HEADER WITH CREATOR PHOTO --- */}
-      <header style={dashboardHeaderStyle}>
-        <h1 style={dashboardTitleStyle}>Lean is Law</h1>
-        
-        {/* Clickable Profile Avatar */}
-        <div style={logoWrapper} onClick={() => navigate("/about")}>
-            <img 
-              src={CreatorPhoto} 
-              alt="The Creator" 
-              style={dashboardLogoStyle} 
+      <header style={{ ...dashboardHeaderStyle, zIndex: settingsOpen ? 200 : 10 }}>
+        <div>
+          <h1 style={dashboardTitleStyle}>Lean is Law</h1>
+          {user && (
+            <p style={signedInStyle}>
+              {user.first_name} {user.last_name}
+            </p>
+          )}
+          <div style={rankRowStyle}>
+            <span style={rankBadgeStyle}>{currentRank}</span>
+            <span style={rankSubtextStyle}>
+              {workoutCount} workout{workoutCount === 1 ? "" : "s"} logged
+            </span>
+          </div>
+          {(currentRank === "SUBHUMAN" || currentRank === "SUB-5" || currentRank === "LTN") && (
+            <div style={{ marginTop: '8px', maxWidth: '90px' }}>
+              <img 
+                src={Sub5Image} 
+                alt="Sub-5 struggle" 
+                style={{ width: '100%', height: 'auto' }} 
+              />
+            </div>
+          )}
+        </div>
+
+        <div style={headerActionsStyle}>
+          <button
+            type="button"
+            aria-label="Open settings menu"
+            aria-expanded={settingsOpen}
+            onClick={() => setSettingsOpen((open) => !open)}
+            style={hamburgerBtnStyle}
+          >
+            <span style={hamburgerBarStyle} />
+            <span style={hamburgerBarStyle} />
+            <span style={hamburgerBarStyle} />
+          </button>
+          <div style={logoWrapper} onClick={() => navigate("/about")}>
+            <img
+              src={CreatorPhoto}
+              alt="The Creator"
+              style={dashboardLogoStyle}
             />
+          </div>
+          {settingsOpen && (
+            <>
+              <div
+                role="presentation"
+                style={settingsBackdropStyle}
+                onClick={() => setSettingsOpen(false)}
+              />
+              <div style={settingsPanelStyle} role="dialog" aria-label="Settings">
+                <p style={settingsPanelTitleStyle}>Settings</p>
+                <p style={settingsUnitsLabelStyle}>Units (app-wide)</p>
+                <div style={settingsSegmentGroupStyle}>
+                  <button
+                    type="button"
+                    onClick={() => setUnits("metric")}
+                    style={units === "metric" ? settingsSegmentActiveStyle : settingsSegmentIdleStyle}
+                  >
+                    Metric
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUnits("imperial")}
+                    style={units === "imperial" ? settingsSegmentActiveStyle : settingsSegmentIdleStyle}
+                  >
+                    Imperial
+                  </button>
+                </div>
+                <p style={settingsUnitsLabelStyle}>Food serving unit</p>
+                <div style={settingsSegmentGroupStyle}>
+                  <button
+                    type="button"
+                    onClick={() => setFoodUnit("metric")}
+                    style={foodUnit === "metric" ? settingsSegmentActiveStyle : settingsSegmentIdleStyle}
+                  >
+                    Grams
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFoodUnit("imperial")}
+                    style={foodUnit === "imperial" ? settingsSegmentActiveStyle : settingsSegmentIdleStyle}
+                  >
+                    Ounces
+                  </button>
+                </div>
+                {user?.id != null ? (
+                  <>
+                    <p style={settingsAccountIdLabelStyle}>Account id</p>
+                    <p style={settingsAccountIdHintStyle}>
+                      Use this number for{" "}
+                      <code style={settingsCodeStyle}>SEED_USER_ID</code> when running the demo
+                      analytics seed from your computer.
+                    </p>
+                    <p style={settingsAccountIdValueStyle}>{user.id}</p>
+                  </>
+                ) : null}
+                <button type="button" style={settingsLogoutItemStyle} onClick={handleLogout}>
+                  Log out
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </header>
 
       <div style={{ padding: '0 20px' }}>
-        {/* --- ACTION BUTTONS --- */}
-        <div style={{ margin: '25px 0', display: 'flex', gap: '10px' }}>
-          <Link to="/exercises" style={{ flex: 1, textDecoration: 'none' }}>
-            <button style={btnStyle}>Browse Exercises</button>
+        <DashboardInsights token={token} />
+        <div style={{ margin: '8px 0 25px' }}>
+          <Link to="/tdee" style={{ display: 'block', textDecoration: 'none' }}>
+            <button type="button" style={{ ...btnStyle, width: '100%', fontWeight: '800' }}>
+              TDEE & metabolism
+            </button>
           </Link>
-          <Link to="/workoutSessions" style={{ flex: 1, textDecoration: 'none' }}>
-            <button style={{ ...btnStyle, backgroundColor: '#007aff', color: 'white', border: 'none' }}>Empty Workout</button>
-          </Link>
+          {ALLOW_REPEAT_TDEE && (
+            <Link to="/setup/tdee" style={{ display: 'block', textDecoration: 'none', marginTop: '10px' }}>
+              <button type="button" style={{ ...btnStyle, width: '100%', fontWeight: '600', fontSize: '0.9rem' }}>
+                Redo energy setup (testing)
+              </button>
+            </Link>
+          )}
         </div>
 
         {/* Templates Section */}
-        <section style={{ marginBottom: '40px' }}>
+        <section id="dashboard-templates" style={{ marginBottom: '40px' }}>
           <h2 style={sectionHeaderStyle}>My Templates</h2>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
             {templates.map(temp => (
@@ -78,13 +225,18 @@ const Dashboard = () => {
         </section>
 
         {/* History Section */}
-        <section>
+        <section id="dashboard-history">
           <h2 style={sectionHeaderStyle}>Recent History</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {history.map(log => (
               <div key={log.id} style={historyItemStyle}>
                 <div>
-                  <div style={{ fontWeight: '700', fontSize: '1rem' }}>{log.name}</div>
+                  <div style={{ fontWeight: '700', fontSize: '1rem' }}>
+                    {log.name}
+                    {log.is_template && (
+                      <span style={templateTagStyle}>TEMPLATE</span>
+                    )}
+                  </div>
                   <div style={{ fontSize: '0.85rem', color: '#8e8e93' }}>{new Date(log.date).toLocaleDateString()}</div>
                 </div>
                 <button onClick={() => navigate(`/workout/${log.id}`)} style={viewBtnStyle}>View</button>
@@ -138,7 +290,12 @@ const TemplatePreviewModal = ({ template, exercises, onClose, onStart }) => {
 };
 
 // --- STYLES ---
-const containerStyle = { backgroundColor: '#f2f2f7', minHeight: '100vh', paddingBottom: '40px', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' };
+const containerStyle = {
+    backgroundColor: '#f2f2f7',
+    minHeight: '100vh',
+    paddingBottom: 'calc(48px + 62px + env(safe-area-inset-bottom, 0px))',
+    fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif',
+};
 
 const dashboardHeaderStyle = { 
   display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
@@ -147,6 +304,124 @@ const dashboardHeaderStyle = {
 };
 
 const dashboardTitleStyle = { margin: 0, fontSize: '1.4rem', fontWeight: '900', color: '#000', letterSpacing: '-0.5px' };
+const signedInStyle = { margin: '6px 0 0', fontSize: '0.85rem', color: '#8e8e93', fontWeight: '600' };
+
+const rankRowStyle = { display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' };
+const rankBadgeStyle = { padding: '2px 10px', borderRadius: '999px', backgroundColor: '#000', color: '#fff', fontSize: '0.7rem', fontWeight: '800', letterSpacing: '1px' };
+const rankSubtextStyle = { fontSize: '0.75rem', color: '#8e8e93', fontWeight: '600' };
+
+const headerActionsStyle = { display: 'flex', alignItems: 'center', gap: '10px', position: 'relative' };
+const hamburgerBtnStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  justifyContent: 'center',
+  gap: '5px',
+  width: '40px',
+  height: '40px',
+  border: 'none',
+  background: 'transparent',
+  cursor: 'pointer',
+  borderRadius: '10px',
+  padding: '8px',
+};
+const hamburgerBarStyle = { display: 'block', width: '20px', height: '2px', backgroundColor: '#000', borderRadius: '1px', alignSelf: 'center' };
+const settingsBackdropStyle = { position: 'fixed', inset: 0, zIndex: 198, background: 'rgba(0,0,0,0.12)' };
+const settingsPanelStyle = {
+  position: 'absolute',
+  top: 'calc(100% + 8px)',
+  right: 0,
+  zIndex: 199,
+  backgroundColor: '#fff',
+  borderRadius: '14px',
+  boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+  border: '0.5px solid #e5e5ea',
+  minWidth: '220px',
+  overflow: 'hidden',
+};
+const settingsPanelTitleStyle = {
+  margin: 0,
+  padding: '12px 16px 8px',
+  fontSize: '0.7rem',
+  fontWeight: '800',
+  color: '#8e8e93',
+  letterSpacing: '1px',
+  textTransform: 'uppercase',
+};
+const settingsUnitsLabelStyle = {
+  margin: 0,
+  padding: '0 16px 8px',
+  fontSize: '0.85rem',
+  fontWeight: '600',
+  color: '#3a3a3c',
+};
+const settingsSegmentGroupStyle = {
+  display: 'flex',
+  margin: '0 16px 12px',
+  borderRadius: 10,
+  overflow: 'hidden',
+  border: '1px solid #d1d1d6',
+  backgroundColor: '#e5e5ea',
+};
+const settingsSegmentIdleStyle = {
+  flex: 1,
+  border: 'none',
+  padding: '10px 12px',
+  fontSize: '0.85rem',
+  fontWeight: '600',
+  color: '#636366',
+  backgroundColor: 'transparent',
+  cursor: 'pointer',
+};
+const settingsSegmentActiveStyle = {
+  ...settingsSegmentIdleStyle,
+  backgroundColor: '#fff',
+  color: '#000',
+  boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+};
+const settingsAccountIdLabelStyle = {
+  margin: 0,
+  padding: '12px 16px 4px',
+  fontSize: '0.7rem',
+  fontWeight: '800',
+  color: '#8e8e93',
+  letterSpacing: '1px',
+  textTransform: 'uppercase',
+};
+const settingsAccountIdHintStyle = {
+  margin: 0,
+  padding: '0 16px 8px',
+  fontSize: '0.75rem',
+  color: '#636366',
+  lineHeight: 1.35,
+};
+const settingsAccountIdValueStyle = {
+  margin: 0,
+  padding: '0 16px 14px',
+  fontSize: '1.15rem',
+  fontWeight: '700',
+  fontVariantNumeric: 'tabular-nums',
+  color: '#000',
+  letterSpacing: '0.02em',
+};
+const settingsCodeStyle = {
+  fontSize: '0.72rem',
+  backgroundColor: '#f2f2f7',
+  padding: '2px 5px',
+  borderRadius: 4,
+  fontWeight: 600,
+};
+const settingsLogoutItemStyle = {
+  width: '100%',
+  textAlign: 'left',
+  padding: '14px 16px',
+  border: 'none',
+  borderTop: '0.5px solid #f2f2f7',
+  background: '#fff',
+  fontSize: '1rem',
+  fontWeight: '600',
+  color: '#007aff',
+  cursor: 'pointer',
+};
 
 const logoWrapper = { 
   width: '42px', height: '42px', borderRadius: '50%', border: '2px solid #007aff', 
@@ -161,6 +436,7 @@ const sectionHeaderStyle = { fontSize: '1.1rem', fontWeight: '800', marginBottom
 const cardStyle = { padding: '20px', backgroundColor: '#fff', borderRadius: '15px', border: 'none', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' };
 const historyItemStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', backgroundColor: '#fff', borderRadius: '12px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' };
 const viewBtnStyle = { background: 'none', border: 'none', color: '#007aff', fontWeight: '600', cursor: 'pointer' };
+const templateTagStyle = { marginLeft: '8px', fontSize: '0.65rem', color: '#007aff', fontWeight: '800', letterSpacing: '0.5px' };
 
 const overlayStyle = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 };
 const modalStyle = { backgroundColor: '#1c1c1e', color: 'white', width: '90%', maxWidth: '400px', borderRadius: '25px', padding: '25px' };

@@ -1,16 +1,23 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { authBearerHeaders } from '../apiHeaders';
 
 const Templates = () => {
     const [templates, setTemplates] = useState([]);
     const navigate = useNavigate();
+    const { token } = useAuth();
 
     useEffect(() => {
-        fetch('/api/v1/workoutSessions/templates')
-            .then(res => res.json())
-            .then(data => setTemplates(data))
-            .catch(err => console.error("Template load error:", err));
-    }, []);
+        if (!token) {
+            setTemplates([]);
+            return;
+        }
+        fetch('/api/v1/workoutSessions/templates', { headers: authBearerHeaders(token) })
+            .then((res) => res.json())
+            .then((data) => setTemplates(Array.isArray(data) ? data : []))
+            .catch((err) => console.error("Template load error:", err));
+    }, [token]);
 
     return (
         <div style={{ padding: '20px' }}>

@@ -1,5 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+// Assuming you have moved image_9.png to src/assets and renamed it to creator_photo.png
 import CreatorPhoto from "../assets/creator_photo.png"; 
 
 const AboutPage = () => {
@@ -9,15 +10,16 @@ const AboutPage = () => {
     <div style={containerStyle}>
       <header style={headerStyle}>
         <button onClick={() => navigate(-1)} style={backBtnStyle}>✕</button>
-        <h1 style={headerTitle}>The Architect</h1>
+        <h1 style={headerTitle}>True Chad</h1>
         <div style={{ width: '24px' }}></div> 
       </header>
 
       <div style={profileCard}>
-        <div style={imageWrapper}>
-          <img src={CreatorPhoto} alt="The #2 Ranked Chad" style={imageStyle} />
+        {/* The updated square wrapper */}
+        <div style={imageWrapperSquare}>
+          <img src={CreatorPhoto} alt="The Way of the Chad" style={imageStyleSquare} />
         </div>
-        <h2 style={nameStyle}>The #2 Ranked Chad</h2>
+        <h2 style={nameStyle}>The Way of the Chad</h2>
         <div style={badgeContainer}>
           <span style={statusBadge}>ASCENDED</span>
           <span style={rankBadge}>ELITE II</span>
@@ -25,7 +27,7 @@ const AboutPage = () => {
       </div>
 
       <div style={manifestoCard}>
-        <h3 style={labelStyle}>THE ABSOLUTE DECREE</h3>
+        <h3 style={labelStyle}>MOG OR BE MOGGED</h3>
         <p style={mainQuoteStyle}>
           "Lean is Law. <br /> 
           Lean is <span style={{ color: '#007aff' }}>Always</span> Law."
@@ -39,7 +41,7 @@ const AboutPage = () => {
         </p>
 
         <p style={powerfulTextStyle}>
-          To reach the peak, there is only one choice: 
+          To become a chad, there is only one choice, 
           <strong> ASCEND.</strong>
         </p>
       </div>
@@ -65,8 +67,25 @@ const backBtnStyle = { background: "none", border: "none", fontSize: "1.5rem", c
 const headerTitle = { fontSize: "0.8rem", fontWeight: "800", textTransform: 'uppercase', letterSpacing: '2px', color: '#8e8e93' };
 
 const profileCard = { display: "flex", flexDirection: "column", alignItems: "center", marginBottom: "40px" };
-const imageWrapper = { width: "180px", height: "180px", borderRadius: "50%", border: "6px solid #fff", overflow: "hidden", boxShadow: "0 20px 40px rgba(0,0,0,0.2)" };
-const imageStyle = { width: "100%", height: "100%", objectFit: "cover" };
+
+// --- MODIFIED STYLES START ---
+// We remove the 50% border radius and add a small radius (8-12px) for consistency with badges.
+const imageWrapperSquare = { 
+  width: "180px", 
+  height: "180px", 
+  borderRadius: "12px", // Square with subtle rounding
+  border: "6px solid #fff", 
+  overflow: "hidden", 
+  boxShadow: "0 20px 40px rgba(0,0,0,0.2)",
+  backgroundColor: '#f6f6f6' // Slight background color in case image doesn't fill
+};
+
+const imageStyleSquare = { 
+  width: "100%", 
+  height: "100%", 
+  objectFit: "cover" // Ensures image scales inside the square without distortion
+};
+// --- MODIFIED STYLES END ---
 
 const nameStyle = { fontSize: "2rem", fontWeight: "900", marginTop: "24px", marginBottom: "12px", letterSpacing: "-1px", color: '#000' };
 const badgeContainer = { display: 'flex', gap: '8px' };

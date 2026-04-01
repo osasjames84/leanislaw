@@ -1,113 +1,140 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 
 const StartWorkout = () => {
     const navigate = useNavigate();
-    const [formData, setFormData] = useState({ name: "", user_id: "" });
+    const { token, user } = useAuth();
+    const [name, setName] = useState("");
+    const [error, setError] = useState("");
+    const [submitting, setSubmitting] = useState(false);
 
     const handleUpload = async (e) => {
         e.preventDefault();
-        const response = await fetch(`/api/v1/workoutSessions`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(formData)
-        });
+        setError("");
+        if (!token || !user?.id) {
+            setError("You need to be signed in to start a workout.");
+            return;
+        }
+        setSubmitting(true);
+        try {
+            const response = await fetch(`/api/v1/workoutSessions`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    name: name.trim(),
+                    is_template: false,
+                }),
+            });
 
-        if (response.ok) {
-            const data = await response.json();
-            navigate(`/workoutSessions/${data.id}`);
-        } else {
-            const errorData = await response.json();
-            console.error("Server Error:", errorData);
-            alert(`Error: ${errorData.error}`);
+            const data = await response.json().catch(() => ({}));
+            if (response.ok) {
+                navigate(`/workout/${data.id}`);
+            } else {
+                const msg = data.message || data.error || "Could not start workout";
+                setError(msg);
+            }
+        } catch {
+            setError("Network error. Try again.");
+        } finally {
+            setSubmitting(false);
         }
     };
 
     return (
         <div style={pageContainer}>
             <header style={headerStyle}>
-                {/* Both the X and the Cancel button now go back */}
-                <div onClick={() => navigate(-1)} style={backBtn}>✕</div>
-                <h1 style={headerTitle}>Initiate Session</h1>
-                <div style={rankBadge}>Sub Human</div>
+                <div onClick={() => navigate(-1)} style={backBtn} role="button" tabIndex={0} onKeyDown={(e) => e.key === "Enter" && navigate(-1)}>✕</div>
+                <h1 style={headerTitle}>New workout</h1>
+                <div style={headerSpacer} />
             </header>
 
-            <form onSubmit={handleUpload} style={formStyle}>
-                <div style={inputSection}>
-                    <label style={labelStyle}>WORKOUT NAME</label>
-                    <input 
-                        style={sleekInput}
-                        placeholder="e.g., Heavy Push"
-                        value={formData.name} 
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })} 
+            <div style={contentWrap}>
+                {user && (
+                    <p style={signedInAs}>
+                        Signed in as <strong>{user.first_name}</strong>
+                    </p>
+                )}
+                <form onSubmit={handleUpload} style={formStyle}>
+                    {error && <div style={errorBanner}>{error}</div>}
+                    <label style={visuallyHidden} htmlFor="workout-name">Workout name</label>
+                    <input
+                        id="workout-name"
+                        style={inputStyle}
+                        placeholder="Workout name (e.g. Push day)"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        autoFocus
+                        required
                     />
-                </div>
 
-                <div style={inputSection}>
-                    <label style={labelStyle}>USER IDENTIFIER</label>
-                    <input 
-                        style={sleekInput}
-                        placeholder="Enter ID"
-                        value={formData.user_id} 
-                        onChange={(e) => setFormData({ ...formData, user_id: e.target.value })} 
-                    />
-                </div>
+                    <button type="submit" disabled={submitting} style={{ ...primaryBtn, opacity: submitting ? 0.65 : 1 }}>
+                        {submitting ? "Starting…" : "Start workout"}
+                    </button>
 
-                <div style={footerStyle}>
-                    <div style={actionGroup}>
-                        <p style={ascendText}>ARE YOU READY TO ASCEND?</p>
-                        <button type="submit" style={startBtn}>START WORKOUT</button>
-                    </div>
-
-                    <div style={actionGroup}>
-                        <p style={sub5Text}>OR REMAIN SUB-5...</p>
-                        <button 
-                            type="button" 
-                            onClick={() => navigate(-1)} // Now matches the 'X' behavior
-                            style={cancelBtn}
-                        >
-                            CANCEL SESSION
-                        </button>
-                    </div>
-                </div>
-            </form>
+                    <button type="button" onClick={() => navigate(-1)} style={secondaryBtn}>
+                        Cancel
+                    </button>
+                </form>
+            </div>
         </div>
     );
-}
+};
 
-// --- STYLES ---
-const pageContainer = { backgroundColor: "#f2f2f7", minHeight: "100vh", fontFamily: '-apple-system, sans-serif' };
-
-const headerStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px", backgroundColor: "#fff", borderBottom: "0.5px solid #d1d1d6" };
-const backBtn = { fontSize: "1.2rem", color: "#8e8e93", cursor: "pointer", padding: "5px" };
-const headerTitle = { fontSize: "1rem", fontWeight: "700", margin: 0 };
-const rankBadge = { backgroundColor: "#000", color: "#fff", padding: "4px 10px", borderRadius: "6px", fontSize: "0.7rem", fontWeight: "900" };
-
-const formStyle = { padding: "30px 20px", display: "flex", flexDirection: "column", gap: "25px" };
-
-const inputSection = { display: "flex", flexDirection: "column", gap: "8px" };
-const labelStyle = { fontSize: "0.7rem", fontWeight: "800", color: "#8e8e93", letterSpacing: "1px" };
-const sleekInput = { padding: "15px 0", fontSize: "1.2rem", border: "none", borderBottom: "2px solid #d1d1d6", backgroundColor: "transparent", outline: "none", fontWeight: "600" };
-
-const footerStyle = { marginTop: "auto", display: "flex", flexDirection: "column", gap: "30px", paddingTop: "40px" };
-const actionGroup = { display: "flex", flexDirection: "column", alignItems: "center", gap: "10px" };
-
-const ascendText = { fontSize: "0.75rem", fontWeight: "900", color: "#007aff", margin: 0, letterSpacing: "1px" };
-const sub5Text = { fontSize: "0.75rem", fontWeight: "900", color: "#ff3b30", margin: 0, letterSpacing: "1px" };
-
-const startBtn = { width: "100%", padding: "20px", borderRadius: "16px", border: "none", backgroundColor: "#000", color: "#fff", fontWeight: "900", fontSize: "1.1rem", cursor: "pointer", boxShadow: "0 10px 20px rgba(0,0,0,0.15)" };
-
-// Updated Cancel Button - Red border and text to match the "Sub-5" warning
-const cancelBtn = { 
-    width: "100%", 
-    padding: "15px", 
-    borderRadius: "16px", 
-    border: "2px solid #ff3b30", // Bold Red border
-    backgroundColor: "transparent", 
-    color: "#ff3b30", // Matching Red text
-    fontWeight: "800", 
-    fontSize: "0.9rem", 
-    cursor: "pointer" 
+const pageContainer = { backgroundColor: "#f2f2f7", minHeight: "100vh", fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' };
+const headerStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px", backgroundColor: "#fff", borderBottom: "0.5px solid #d1d1d6", position: "sticky", top: 0, zIndex: 5 };
+const backBtn = { fontSize: "1.25rem", color: "#262626", cursor: "pointer", padding: "4px", lineHeight: 1 };
+const headerTitle = { fontSize: "1rem", fontWeight: "600", margin: 0, color: "#262626" };
+const headerSpacer = { width: 28 };
+const contentWrap = { maxWidth: 400, margin: "0 auto", padding: "24px 16px" };
+const signedInAs = { fontSize: "0.85rem", color: "#8e8e93", margin: "0 0 20px", textAlign: "center" };
+const formStyle = { display: "flex", flexDirection: "column", gap: 12 };
+const visuallyHidden = { position: "absolute", width: 1, height: 1, padding: 0, margin: -1, overflow: "hidden", clip: "rect(0,0,0,0)", whiteSpace: "nowrap", border: 0 };
+const inputStyle = {
+    width: "100%",
+    boxSizing: "border-box",
+    padding: "14px 16px",
+    fontSize: "1rem",
+    border: "1px solid #e5e5ea",
+    borderRadius: 12,
+    backgroundColor: "#fafafa",
+    outline: "none",
+    color: "#000",
+};
+const primaryBtn = {
+    width: "100%",
+    marginTop: 8,
+    padding: "16px 20px",
+    borderRadius: 14,
+    border: "none",
+    backgroundColor: "#000",
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: "1rem",
+    cursor: "pointer",
+    boxShadow: "0 8px 20px rgba(0,0,0,0.12)",
+};
+const secondaryBtn = {
+    width: "100%",
+    padding: "12px 16px",
+    borderRadius: 12,
+    border: "none",
+    background: "transparent",
+    color: "#007aff",
+    fontWeight: "600",
+    fontSize: "0.95rem",
+    cursor: "pointer",
+};
+const errorBanner = {
+    padding: "10px 12px",
+    borderRadius: 8,
+    backgroundColor: "#fee2e2",
+    color: "#b91c1c",
+    fontSize: "0.85rem",
+    textAlign: "center",
 };
 
 export default StartWorkout;

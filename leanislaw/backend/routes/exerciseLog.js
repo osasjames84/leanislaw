@@ -1,65 +1,101 @@
 import express from 'express';
 import { db } from '../db.js';
-// Make sure these match exactly what is in your schema.js
-import { exerciseLog, exercises } from '../schema.js'; 
-import { eq } from 'drizzle-orm';
+import { exerciseLog, exercises, workoutSessions } from '../schema.js';
+import { eq, and } from 'drizzle-orm';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// 1. GET Logs: Use camelCase key
-router.get('/', async (req, res) => {
-  try {
-    const { workout_sessions_id } = req.query; // This is the URL param
+function uid(req) {
+    const id = Number(req.userId);
+    return Number.isFinite(id) ? id : null;
+}
 
-    const logs = await db.select({
-      id: exerciseLog.id,
-      exercise_id: exerciseLog.exercise_id,
-      sets: exerciseLog.sets,
-      name: exercises.name,
-    })
-    .from(exerciseLog)
-    .leftJoin(exercises, eq(exerciseLog.exercise_id, exercises.id))
-    // FIX: Match the schema key 'workoutSessionsId'
-    .where(eq(exerciseLog.workoutSessionsId, Number(workout_sessions_id))); 
+async function sessionOwnedByUser(sessionId, userId) {
+    if (!Number.isFinite(sessionId) || !Number.isFinite(userId)) return false;
+    const rows = await db
+        .select({ id: workoutSessions.id })
+        .from(workoutSessions)
+        .where(and(eq(workoutSessions.id, sessionId), eq(workoutSessions.user_id, userId)))
+        .limit(1);
+    return rows.length > 0;
+}
 
-    res.json(logs.map(log => ({
-      ...log,
-      sets: Array.isArray(log.sets) ? log.sets : []
-    })));
-  } catch (err) {
-    console.error("SQL Error:", err);
-    res.status(500).json({ error: err.message });
-  }
+async function logOwnedByUser(logId, userId) {
+    const logRows = await db.select().from(exerciseLog).where(eq(exerciseLog.id, logId)).limit(1);
+    const log = logRows[0];
+    if (!log) return null;
+    const ok = await sessionOwnedByUser(log.workoutSessionsId, userId);
+    return ok ? log : null;
+}
+
+router.get('/', requireAuth, async (req, res) => {
+    try {
+        const userId = uid(req);
+        const wid = Number(req.query.workout_sessions_id);
+        if (!Number.isFinite(wid)) {
+            return res.status(400).json({ error: 'workout_sessions_id required' });
+        }
+        const ok = await sessionOwnedByUser(wid, userId);
+        if (!ok) {
+            return res.status(404).json({ error: 'Session not found' });
+        }
+
+        const logs = await db
+            .select({
+                id: exerciseLog.id,
+                exercise_id: exerciseLog.exercise_id,
+                sets: exerciseLog.sets,
+                name: exercises.name,
+            })
+            .from(exerciseLog)
+            .leftJoin(exercises, eq(exerciseLog.exercise_id, exercises.id))
+            .where(eq(exerciseLog.workoutSessionsId, wid));
+
+        res.json(
+            logs.map((log) => ({
+                ...log,
+                sets: Array.isArray(log.sets) ? log.sets : [],
+            }))
+        );
+    } catch (err) {
+        console.error("SQL Error:", err);
+        res.status(500).json({ error: err.message });
+    }
 });
 
-// 2. Get a single log by its own ID
-router.get('/:id', async (req, res) => {
+router.get('/:id', requireAuth, async (req, res) => {
     try {
+        const userId = uid(req);
         const exerciseLogId = Number(req.params.id);
-        const selectedExerciseLog = await db.select()
-            .from(exerciseLog)
-            .where(eq(exerciseLog.id, exerciseLogId));
-
-        if (selectedExerciseLog.length === 0) {
+        const log = await logOwnedByUser(exerciseLogId, userId);
+        if (!log) {
             return res.status(404).send({ error: "Not found" });
         }
-        res.json(selectedExerciseLog[0]);
+        res.json(log);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-// 2. POST Log: Use camelCase key
-router.post('/', async (req, res) => {
+router.post('/', requireAuth, async (req, res) => {
     try {
+        const userId = uid(req);
         const { workout_sessions_id, exercise_id } = req.body;
+        const sid = Number(workout_sessions_id);
+        const ok = await sessionOwnedByUser(sid, userId);
+        if (!ok) {
+            return res.status(404).json({ error: 'Session not found' });
+        }
 
-        const [newLog] = await db.insert(exerciseLog).values({
-            // FIX: Match the schema key 'workoutSessionsId'
-            workoutSessionsId: Number(workout_sessions_id),
-            exercise_id: Number(exercise_id),
-            sets: [] 
-        }).returning();
+        const [newLog] = await db
+            .insert(exerciseLog)
+            .values({
+                workoutSessionsId: sid,
+                exercise_id: Number(exercise_id),
+                sets: [],
+            })
+            .returning();
 
         res.status(201).json(newLog);
     } catch (err) {
@@ -68,16 +104,20 @@ router.post('/', async (req, res) => {
     }
 });
 
-// 4. Update specific log (The "Save Set" route)
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireAuth, async (req, res) => {
     try {
+        const userId = uid(req);
         const logId = Number(req.params.id);
-        const { sets } = req.body; // We only care about the sets array now
+        const log = await logOwnedByUser(logId, userId);
+        if (!log) {
+            return res.status(404).json({ error: 'Not found' });
+        }
 
-        const updatedLog = await db.update(exerciseLog)
-            .set({ 
-                // CRITICAL: sets is now a JSONB array, do NOT use Number()
-                sets: sets || [] 
+        const { sets } = req.body;
+        const updatedLog = await db
+            .update(exerciseLog)
+            .set({
+                sets: sets || [],
             })
             .where(eq(exerciseLog.id, logId))
             .returning();
@@ -89,13 +129,16 @@ router.put('/:id', async (req, res) => {
     }
 });
 
-// 5. Delete an exercise log
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAuth, async (req, res) => {
     try {
+        const userId = uid(req);
         const logId = Number(req.params.id);
-        const deletedLog = await db.delete(exerciseLog)
-            .where(eq(exerciseLog.id, logId))
-            .returning();
+        const log = await logOwnedByUser(logId, userId);
+        if (!log) {
+            return res.status(404).json({ error: 'Not found' });
+        }
+
+        const deletedLog = await db.delete(exerciseLog).where(eq(exerciseLog.id, logId)).returning();
 
         res.json({ message: "Deleted", log: deletedLog[0] });
     } catch (err) {
