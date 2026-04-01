@@ -54,7 +54,13 @@ router.post('/register', async (req, res) => {
             return res.status(409).json({ error: 'Email already registered' });
         }
         console.error('Register error:', err);
-        res.status(500).json({ error: err.message });
+        const msg = String(err.message || err);
+        if (/premium_coaching_active|column .* does not exist/i.test(msg)) {
+            return res.status(503).json({
+                error: 'Database is missing required columns. On production Postgres run migrations (see backend/migrations/007_premium_coaching.sql or npm run migrate).',
+            });
+        }
+        res.status(500).json({ error: 'Could not create account' });
     }
 });
 

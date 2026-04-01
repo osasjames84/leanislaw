@@ -9,6 +9,8 @@
 - Build command: `npm install`
 - Start command: `npm run start`
 
+After the first deploy, apply SQL in `backend/migrations/` (in order) on the same Postgres instance as `DATABASE_URL`, or from your machine: `npm run migrate` with `DATABASE_URL` set to production. Skipping this causes errors like “column premium_coaching_active does not exist” on register/login.
+
 ## 3) Set environment variables
 - `DATABASE_URL`
 - `JWT_SECRET`
