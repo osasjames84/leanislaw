@@ -41,11 +41,31 @@ const PremiumCoaching = () => {
     useEffect(() => {
         if (!token) return;
         fetch("/api/v1/coaching/status", { headers: authBearerHeaders(token) })
-            .then((r) => r.json())
-            .then(setStatus)
-            .catch(() => setStatus(null))
+            .then(async (r) => {
+                const data = await r.json().catch(() => ({}));
+                if (!r.ok) {
+                    setStatus({
+                        ...data,
+                        stripe_checkout_enabled: false,
+                        stripe_status_error: data.error || `Could not load status (${r.status})`,
+                    });
+                    return;
+                }
+                setStatus(data);
+            })
+            .catch(() => setStatus({ stripe_checkout_enabled: false, stripe_status_error: "Network error loading status." }))
             .finally(() => setLoading(false));
     }, [token]);
+
+    const stripeEnv = status?.stripe_env_check;
+    const payBlockedReasons = [];
+    if (!loading && stripeEnv && !checkoutEnabled) {
+        if (!stripeEnv.secret_key) payBlockedReasons.push("STRIPE_SECRET_KEY");
+        if (!stripeEnv.frontend_url) payBlockedReasons.push("FRONTEND_URL (Vercel site, e.g. https://yoursite.vercel.app)");
+        if (!stripeEnv.price_monthly) payBlockedReasons.push("STRIPE_PRICE_ID_MONTHLY");
+        if (!stripeEnv.price_semiannual) payBlockedReasons.push("STRIPE_PRICE_ID_SEMIANNUAL");
+        if (!stripeEnv.price_yearly) payBlockedReasons.push("STRIPE_PRICE_ID_YEARLY");
+    }
 
     const checkoutParam = searchParams.get("checkout");
     useEffect(() => {
@@ -295,8 +315,31 @@ const PremiumCoaching = () => {
                                     : "Secure checkout with Stripe. If your access doesn’t show right away after paying, wait a minute and refresh this page."
                                 : import.meta.env.DEV
                                   ? "Local dev: add Stripe env vars on the backend (see backend/HOSTING_BACKEND.md) to enable Pay."
-                                  : "Online checkout isn’t available yet — please check back soon."}
+                                  : "Checkout is off until your server has the Stripe variables below."}
                         </p>
+                        {status?.stripe_status_error ? (
+                            <p style={{ ...stripeHint, color: "#b45309", marginTop: 8 }}>{status.stripe_status_error}</p>
+                        ) : null}
+                        {!checkoutEnabled && payBlockedReasons.length > 0 ? (
+                            <div style={payBlockedBox}>
+                                <p style={payBlockedTitle}>Set these on Railway (backend service), then redeploy:</p>
+                                <ul style={payBlockedList}>
+                                    {payBlockedReasons.map((line) => (
+                                        <li key={line}>{line}</li>
+                                    ))}
+                                </ul>
+                                <p style={stripeHint}>
+                                    Names must match exactly. Use test <code style={inlineCode}>price_...</code> IDs with a
+                                    test <code style={inlineCode}>sk_test_...</code> key.
+                                </p>
+                            </div>
+                        ) : null}
+                        {!checkoutEnabled && !loading && status && status.stripe_env_check == null && !status.stripe_status_error ? (
+                            <p style={{ ...stripeHint, color: "#b45309", marginTop: 10 }}>
+                                Pay is off. Redeploy the backend on Railway so it has the latest code, then set Stripe
+                                variables on that same service (not only the database).
+                            </p>
+                        ) : null}
                         {import.meta.env.DEV || import.meta.env.VITE_SHOW_COACHING_DEV_UNLOCK === "true" ? (
                             <button
                                 type="button"
@@ -564,6 +607,34 @@ const stripeHint = {
     fontSize: "0.78rem",
     color: "#8e8e93",
     lineHeight: 1.35,
+};
+
+const payBlockedBox = {
+    marginTop: 14,
+    padding: "12px 14px",
+    borderRadius: 12,
+    background: "#fff8eb",
+    border: "1px solid #fde68a",
+    textAlign: "left",
+};
+const payBlockedTitle = {
+    margin: "0 0 8px",
+    fontSize: "0.8rem",
+    fontWeight: 800,
+    color: "#92400e",
+};
+const payBlockedList = {
+    margin: "0 0 8px",
+    paddingLeft: 18,
+    fontSize: "0.78rem",
+    color: "#78350f",
+    lineHeight: 1.45,
+};
+const inlineCode = {
+    fontSize: "0.72rem",
+    background: "#f3f4f6",
+    padding: "1px 4px",
+    borderRadius: 4,
 };
 
 const devBtn = {

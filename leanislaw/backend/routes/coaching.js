@@ -30,6 +30,17 @@ function stripeWebhookConfigured() {
     return Boolean(process.env.STRIPE_WEBHOOK_SECRET?.trim());
 }
 
+/** Booleans only — safe to expose so the app can show why Pay is disabled. */
+function stripeEnvCheck() {
+    return {
+        secret_key: Boolean(process.env.STRIPE_SECRET_KEY?.trim()),
+        frontend_url: Boolean(String(process.env.FRONTEND_URL || '').trim()),
+        price_monthly: Boolean(process.env.STRIPE_PRICE_ID_MONTHLY?.trim()),
+        price_semiannual: Boolean(process.env.STRIPE_PRICE_ID_SEMIANNUAL?.trim()),
+        price_yearly: Boolean(process.env.STRIPE_PRICE_ID_YEARLY?.trim()),
+    };
+}
+
 function priceIdForBilling(billing) {
     const map = {
         monthly: process.env.STRIPE_PRICE_ID_MONTHLY?.trim(),
@@ -73,6 +84,7 @@ router.get('/status', requireAuth, async (req, res) => {
             ...rows[0],
             stripe_checkout_enabled: stripeCheckoutCanStart(),
             stripe_webhook_configured: stripeWebhookConfigured(),
+            stripe_env_check: stripeEnvCheck(),
         });
     } catch (err) {
         res.status(500).json({ error: err.message });
