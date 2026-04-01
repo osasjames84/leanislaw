@@ -98,21 +98,32 @@ function countFormableWords(bankCounts, dict) {
     return n;
 }
 
-/** Pick a 6–8 letter master that unlocks many words (uses full dictionary for counts). */
-function pickMasterLetters(seed, dict) {
-    const candidates = WORD_BANK.filter((w) => w.length >= 6 && w.length <= 8);
-    if (!candidates.length) {
-        const fallback = WORD_BANK.filter((w) => w.length >= 5);
-        return fallback[seed % fallback.length] || "plates";
+const MIN_FORMABLE_WORDS = 4;
+
+/**
+ * Random 5–8 letter master each round: must yield at least MIN_FORMABLE_WORDS plays
+ * (dictionary + gym bank). Uses full eligible pool, not a fixed top-12 slice.
+ */
+function pickMasterLetters(dict) {
+    const byLen = (minLen, maxLen) => WORD_BANK.filter((w) => w.length >= minLen && w.length <= maxLen);
+
+    const tryBands = [
+        () => byLen(6, 8),
+        () => byLen(5, 8),
+        () => byLen(4, 8),
+    ];
+
+    for (const band of tryBands) {
+        const words = band();
+        const playable = words.filter((word) => {
+            const n = countFormableWords(letterCountsFromWord(word), dict);
+            return n >= MIN_FORMABLE_WORDS;
+        });
+        if (playable.length > 0) {
+            return playable[Math.floor(Math.random() * playable.length)];
+        }
     }
-    const scored = candidates.map((word) => ({
-        word,
-        n: countFormableWords(letterCountsFromWord(word), dict),
-    }));
-    scored.sort((a, b) => b.n - a.n);
-    const top = scored.filter((s) => s.n > 0).slice(0, 12);
-    const pickFrom = top.length ? top : scored;
-    return pickFrom[seed % pickFrom.length].word;
+    return "plates";
 }
 
 const CHAD_QUIPS = [
@@ -231,7 +242,7 @@ export default function AnagramGame({ onClose, onGameComplete }) {
     useEffect(() => {
         if (phase !== "play" || !dictReady || !englishDictRef.current) return;
         const dict = englishDictRef.current;
-        const master = pickMasterLetters(sessionKey * 31, dict);
+        const master = pickMasterLetters(dict);
         const tiles = tilesForWord(master, sessionKey);
         bankTilesRef.current = tiles;
         validWordsRef.current = buildValidWordSet(letterCountsFromWord(master), dict);
