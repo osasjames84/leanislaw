@@ -54,10 +54,15 @@ router.post('/register', async (req, res) => {
             return res.status(409).json({ error: 'Email already registered' });
         }
         console.error('Register error:', err);
-        const msg = String(err.message || err);
-        if (/premium_coaching_active|column .* does not exist/i.test(msg)) {
+        const msg = [err?.message, err?.cause?.message].filter(Boolean).join('\n');
+        const isSchema =
+            /premium_coaching_active|tdee_onboarding_done/i.test(msg) ||
+            /42703|undefined_column|column .* does not exist/i.test(msg) ||
+            /Failed query:[\s\S]*insert into "users"/i.test(msg);
+        if (isSchema) {
             return res.status(503).json({
-                error: 'Database is missing required columns. On production Postgres run migrations (see backend/migrations/007_premium_coaching.sql or npm run migrate).',
+                error:
+                    'Database needs updating: open Railway → Postgres → run SQL from backend/migrations/007_premium_coaching.sql (adds premium_coaching_active). Or run: npm run migrate with DATABASE_URL.',
             });
         }
         res.status(500).json({ error: 'Could not create account' });
