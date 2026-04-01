@@ -5,7 +5,7 @@ import anagramBg from "../assets/anagram_bg.png";
 import { getChadEndgameLine } from "../lib/anagramChadLines.js";
 import { playUiSound } from "../lib/uiSounds.js";
 
-/** Fitness / gym words for anagram rounds (4–8 letters). */
+/** Extra valid words (gym slang) in addition to the English dictionary. */
 const WORD_BANK = [
     "bench",
     "squat",
@@ -85,45 +85,42 @@ function buildValidWordSet(bankCounts, dict) {
     return set;
 }
 
-function countFormableWords(bankCounts, dict) {
+const MIN_FORMABLE_WORDS = 4;
+const MASTER_PICK_ATTEMPTS = 160;
+
+function hasEnoughFormableWords(bankCounts, dict, minRequired) {
     let n = 0;
     for (const w of dict) {
-        if (wordFitsBank(w, bankCounts)) n++;
+        if (wordFitsBank(w, bankCounts)) {
+            n++;
+            if (n >= minRequired) return true;
+        }
     }
     for (const w of WORD_BANK) {
         const wl = w.toLowerCase();
         if (wl.length < MIN_WORD_LEN || dict.has(wl)) continue;
-        if (wordFitsBank(wl, bankCounts)) n++;
-    }
-    return n;
-}
-
-const MIN_FORMABLE_WORDS = 4;
-
-/**
- * Random 5–8 letter master each round: must yield at least MIN_FORMABLE_WORDS plays
- * (dictionary + gym bank). Uses full eligible pool, not a fixed top-12 slice.
- */
-function pickMasterLetters(dict) {
-    const byLen = (minLen, maxLen) => WORD_BANK.filter((w) => w.length >= minLen && w.length <= maxLen);
-
-    const tryBands = [
-        () => byLen(6, 8),
-        () => byLen(5, 8),
-        () => byLen(4, 8),
-    ];
-
-    for (const band of tryBands) {
-        const words = band();
-        const playable = words.filter((word) => {
-            const n = countFormableWords(letterCountsFromWord(word), dict);
-            return n >= MIN_FORMABLE_WORDS;
-        });
-        if (playable.length > 0) {
-            return playable[Math.floor(Math.random() * playable.length)];
+        if (wordFitsBank(wl, bankCounts)) {
+            n++;
+            if (n >= minRequired) return true;
         }
     }
-    return "plates";
+    return false;
+}
+
+/**
+ * Random six-letter master from {@link SIX_LETTER_MASTER_BANK} each round.
+ * Rejects boards with too few plays until MIN_FORMABLE_WORDS or attempts exhausted.
+ */
+function pickMasterWord(dict, masterPool) {
+    if (!masterPool.length) return "plates";
+    for (let attempt = 0; attempt < MASTER_PICK_ATTEMPTS; attempt++) {
+        const master = masterPool[Math.floor(Math.random() * masterPool.length)];
+        const counts = letterCountsFromWord(master);
+        if (hasEnoughFormableWords(counts, dict, MIN_FORMABLE_WORDS)) {
+            return master;
+        }
+    }
+    return masterPool[Math.floor(Math.random() * masterPool.length)];
 }
 
 const CHAD_QUIPS = [
@@ -153,14 +150,12 @@ function padScore(n) {
     return String(Math.min(999_999, Math.max(0, n))).padStart(6, "0");
 }
 
-/** Bigger words pay more (7–8 letter plays use extended tier). */
+/** Points by word length (rack is always 6 letters; longest play is 6). */
 function pointsForWordLength(len) {
     if (len <= 3) return 100;
     if (len === 4) return 400;
     if (len === 5) return 1200;
-    if (len === 6) return 2000;
-    if (len === 7) return 3200;
-    return 5000;
+    return 2000;
 }
 
 function computeWinner(youPts, chadPts, youWords, chadWords) {
@@ -188,6 +183,8 @@ export default function AnagramGame({ onClose, onGameComplete }) {
     const [bankLetterCount, setBankLetterCount] = useState(0);
     const sessionEndHandled = useRef(false);
     const bankTilesRef = useRef([]);
+    /** Filled when dictionary loads; six-letter words for random racks. */
+    const masterBankRef = useRef([]);
     const validWordsRef = useRef(new Set());
     const englishDictRef = useRef(null);
     const [dictReady, setDictReady] = useState(false);
@@ -222,9 +219,19 @@ export default function AnagramGame({ onClose, onGameComplete }) {
     useEffect(() => {
         let cancelled = false;
         import("../lib/anagramDictionary.js")
-            .then(({ getAnagramDictionary }) => {
+            .then(({ getAnagramDictionary, getSixLetterMasterBank }) => {
                 if (cancelled) return;
                 englishDictRef.current = getAnagramDictionary();
+                masterBankRef.current = getSixLetterMasterBank();
+                if (
+                    typeof import.meta !== "undefined" &&
+                    import.meta.env?.DEV &&
+                    masterBankRef.current.length < 500
+                ) {
+                    console.warn(
+                        `[anagram] six-letter master bank has only ${masterBankRef.current.length} words (expected 500+)`
+                    );
+                }
                 setDictReady(true);
             })
             .catch(() => {
@@ -232,6 +239,7 @@ export default function AnagramGame({ onClose, onGameComplete }) {
                 englishDictRef.current = new Set(
                     WORD_BANK.filter((x) => x.length >= MIN_WORD_LEN).map((x) => x.toLowerCase())
                 );
+                masterBankRef.current = WORD_BANK.filter((w) => w.length === 6).map((w) => w.toLowerCase());
                 setDictReady(true);
             });
         return () => {
@@ -242,7 +250,8 @@ export default function AnagramGame({ onClose, onGameComplete }) {
     useEffect(() => {
         if (phase !== "play" || !dictReady || !englishDictRef.current) return;
         const dict = englishDictRef.current;
-        const master = pickMasterLetters(dict);
+        const bank = masterBankRef.current;
+        const master = pickMasterWord(dict, bank.length ? bank : ["plates"]);
         const tiles = tilesForWord(master, sessionKey);
         bankTilesRef.current = tiles;
         validWordsRef.current = buildValidWordSet(letterCountsFromWord(master), dict);
@@ -510,13 +519,14 @@ export default function AnagramGame({ onClose, onGameComplete }) {
                         <div style={howToCard}>
                             <h2 style={howToTitle}>How to play:</h2>
                             <p style={howToBody}>
-                                <strong>Chad is on the same letter bank</strong> — higher score wins in{" "}
-                                <strong>60 seconds</strong>. He starts chill; hit <strong>Taunt Chad</strong> if you want him
-                                to hunt faster (risky). Spell <strong>different real English words</strong> (3+ letters).
-                                After each hit, tiles reset. Tap letters, then <strong>Enter</strong>.
+                                <strong>Six letters</strong> every round (random word from a large bank). Chad uses the same
+                                rack — higher score wins in <strong>60 seconds</strong>. He starts chill; hit{" "}
+                                <strong>Taunt Chad</strong> to make him hunt faster (risky). Spell{" "}
+                                <strong>different real English words</strong> (3–6 letters). After each hit, tiles reset.
+                                Tap letters, then <strong>Enter</strong>.
                             </p>
                             <div style={introTilesRow} aria-hidden>
-                                {["L", "I", "F", "T", "S"].map((ch, i) => (
+                                {["R", "A", "N", "D", "O", "M"].map((ch, i) => (
                                     <div key={i} style={woodTileStatic}>
                                         {ch}
                                     </div>
@@ -611,7 +621,7 @@ export default function AnagramGame({ onClose, onGameComplete }) {
                                 </button>
 
                                 <p style={guessHint}>
-                                    Your word {bankLetterCount ? `— up to ${bankLetterCount} letters this round` : ""}
+                                    Your word {bankLetterCount ? `— up to ${bankLetterCount} letters (max 6)` : ""}
                                 </p>
                                 <div style={{ ...slotsWrap }}>
                                     {invalidX ? (
