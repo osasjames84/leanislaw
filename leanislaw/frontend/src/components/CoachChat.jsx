@@ -198,7 +198,10 @@ const CoachChat = () => {
 };
 
 const page = {
+    position: "fixed",
+    inset: 0,
     height: "100dvh",
+    width: "100%",
     display: "flex",
     flexDirection: "column",
     overflow: "hidden",
@@ -206,9 +209,7 @@ const page = {
     fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif',
 };
 const header = {
-    position: "sticky",
-    top: 0,
-    zIndex: 10,
+    flexShrink: 0,
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
@@ -270,9 +271,7 @@ const bubbleUser = { alignSelf: "flex-end", background: "#007aff", color: "#fff"
 const typing = { fontSize: "0.78rem", color: "#8e8e93", marginTop: 4 };
 const err = { fontSize: "0.82rem", color: "#b45309", background: "#fff8eb", padding: "8px 10px", borderRadius: 10 };
 const composer = {
-    position: "sticky",
-    bottom: 0,
-    zIndex: 10,
+    flexShrink: 0,
     // Keep input bar above fixed bottom nav.
     padding: "10px 12px calc(74px + env(safe-area-inset-bottom, 0px))",
     borderTop: "0.5px solid #d1d1d6",
