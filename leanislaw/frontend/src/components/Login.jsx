@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import ChadPhoto from "../assets/creator_photo.png";
 
 const Login = () => {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const coachMode = searchParams.get("coach") === "1" || searchParams.get("mode") === "coach";
     const { login } = useAuth();
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -18,6 +20,17 @@ const Login = () => {
         setSubmitting(true);
         try {
             const u = await login(email.trim(), password);
+            if (coachMode) {
+                if (u?.role !== "coach") {
+                    throw new Error("This sign-in is for coach accounts only. Use the regular sign in for clients.");
+                }
+                navigate("/coach", { replace: true });
+                return;
+            }
+            if (u?.role === "coach") {
+                navigate("/coach", { replace: true });
+                return;
+            }
             const needsSetup = u && u.tdee_onboarding_done === false;
             navigate(needsSetup ? "/setup/tdee" : "/dashboard", { replace: true });
         } catch (err) {
@@ -35,7 +48,9 @@ const Login = () => {
                         <img src={ChadPhoto} alt="The way of the chad" style={avatarImg} />
                     </div>
                     <h1 style={title}>Lean is Law</h1>
-                    <p style={subtitle}>Sign in to continue</p>
+                    <p style={subtitle}>
+                        {coachMode ? "Coach sign in" : "Sign in to continue"}
+                    </p>
                 </div>
 
                 <form onSubmit={handleSubmit} style={form}>
@@ -88,6 +103,15 @@ const Login = () => {
                     New here?{" "}
                     <Link to="/register" style={link}>Create an account</Link>
                 </p>
+                {!coachMode ? (
+                    <p style={{ ...footerLine, marginTop: 12 }}>Coach?{" "}
+                        <Link to="/login?coach=1" style={link}>Sign in as coach</Link>
+                    </p>
+                ) : (
+                    <p style={{ ...footerLine, marginTop: 12 }}>
+                        <Link to="/login" style={link}>Client sign in</Link>
+                    </p>
+                )}
             </div>
         </div>
     );

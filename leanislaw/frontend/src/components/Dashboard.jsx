@@ -37,7 +37,7 @@ const Dashboard = () => {
   const { units, setUnits, foodUnit, setFoodUnit } = useUnits();
 
   useEffect(() => {
-    if (!authLoading && user && user.tdee_onboarding_done === false) {
+    if (!authLoading && user && user.role !== "coach" && user.tdee_onboarding_done === false) {
       navigate("/setup/tdee", { replace: true });
     }
   }, [authLoading, user, navigate]);
@@ -140,6 +140,23 @@ const Dashboard = () => {
               />
               <div style={settingsPanelStyle} role="dialog" aria-label="Settings">
                 <p style={settingsPanelTitleStyle}>Settings</p>
+                <Link
+                  to="/premium-coaching"
+                  onClick={() => setSettingsOpen(false)}
+                  style={settingsPremiumCoachingRowStyle}
+                >
+                  <span>Premium coaching</span>
+                  <span style={premiumBadgeStyle}>PRO</span>
+                </Link>
+                {user?.role === "coach" ? (
+                  <Link
+                    to="/coach"
+                    onClick={() => setSettingsOpen(false)}
+                    style={settingsCoachLinkStyle}
+                  >
+                    Coach dashboard
+                  </Link>
+                ) : null}
                 <p style={settingsUnitsLabelStyle}>Units (app-wide)</p>
                 <div style={settingsSegmentGroupStyle}>
                   <button
@@ -346,6 +363,40 @@ const settingsPanelTitleStyle = {
   color: '#8e8e93',
   letterSpacing: '1px',
   textTransform: 'uppercase',
+};
+const settingsPremiumCoachingRowStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 10,
+  margin: '0 8px 10px',
+  padding: '12px 12px',
+  borderRadius: 10,
+  backgroundColor: '#f2f2f7',
+  textDecoration: 'none',
+  color: '#000',
+  fontSize: '0.95rem',
+  fontWeight: '700',
+};
+const premiumBadgeStyle = {
+  fontSize: '0.65rem',
+  fontWeight: '800',
+  letterSpacing: '0.5px',
+  color: '#fff',
+  background: 'linear-gradient(135deg, #ff9500, #ff3b30)',
+  padding: '3px 8px',
+  borderRadius: 6,
+};
+const settingsCoachLinkStyle = {
+  display: 'block',
+  margin: '0 8px 12px',
+  padding: '10px 12px',
+  borderRadius: 10,
+  border: '0.5px solid #e5e5ea',
+  textDecoration: 'none',
+  color: '#007aff',
+  fontSize: '0.9rem',
+  fontWeight: '600',
 };
 const settingsUnitsLabelStyle = {
   margin: 0,

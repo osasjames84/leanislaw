@@ -1,5 +1,6 @@
 import express from 'express';
 import { requireAuth } from '../middleware/auth.js';
+import { requireCoach } from './coaching.js';
 import { glossaryMatchesFromText } from '../lib/chadGlossary.js';
 import { loreSystemContext } from '../lib/chadLore.js';
 import { knowledgeCount, searchKnowledge } from '../lib/knowledgeStore.js';
@@ -249,7 +250,7 @@ async function latestWeightKg(userId) {
     return weight?.weight_kg != null ? Number(weight.weight_kg) : null;
 }
 
-router.get('/training/questions', requireAuth, async (_req, res) => {
+router.get('/training/questions', requireAuth, requireCoach, async (_req, res) => {
     res.json({ questions: TRAINING_QUESTIONS });
 });
 
@@ -262,7 +263,7 @@ router.get('/knowledge/status', requireAuth, async (_req, res) => {
     }
 });
 
-router.get('/training', requireAuth, async (req, res) => {
+router.get('/training', requireAuth, requireCoach, async (req, res) => {
     try {
         const userId = Number(req.userId);
         const answers = await getProfileAnswers(userId);
@@ -295,7 +296,7 @@ router.get('/history', requireAuth, async (req, res) => {
     }
 });
 
-router.put('/training', requireAuth, async (req, res) => {
+router.put('/training', requireAuth, requireCoach, async (req, res) => {
     try {
         const userId = Number(req.userId);
         const incoming = Array.isArray(req.body?.answers) ? req.body.answers : [];

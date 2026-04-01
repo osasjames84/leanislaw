@@ -3,10 +3,11 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "npm --prefix frontend run test",
     "dev": "nodemon backend/server.js",
     "start": "node backend/server.js",
-    "seed-demo-analytics": "node backend/scripts/seed-dashboard-demo.js"
+    "seed-demo-analytics": "node backend/scripts/seed-dashboard-demo.js",
+    "migrate": "node backend/scripts/apply-sql-migrations.js"
   },
   "keywords": [],
   "author": "",

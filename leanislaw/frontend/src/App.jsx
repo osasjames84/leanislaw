@@ -20,6 +20,9 @@ import WorkoutHub from "./components/WorkoutHub";
 import InsightsPage from "./components/InsightsPage";
 import InsightDetailPage from "./components/InsightDetailPage";
 import CoachChat from "./components/CoachChat";
+import CoachRoute from "./components/CoachRoute";
+import CoachDashboard from "./components/CoachDashboard";
+import PremiumCoaching from "./components/PremiumCoaching";
 import { AuthProvider } from "./contexts/AuthContext";
 import { UnitsProvider } from "./contexts/UnitsContext";
 
@@ -52,6 +55,15 @@ const App = () => {
               <Route path="/tdee" element={<TdeeCalculator />} />
               <Route path="/workout" element={<WorkoutHub />} />
               <Route path="/chat" element={<CoachChat />} />
+              <Route path="/premium-coaching" element={<PremiumCoaching />} />
+              <Route
+                path="/coach"
+                element={
+                  <CoachRoute>
+                    <CoachDashboard />
+                  </CoachRoute>
+                }
+              />
             </Route>
             <Route
               path="/exercises"

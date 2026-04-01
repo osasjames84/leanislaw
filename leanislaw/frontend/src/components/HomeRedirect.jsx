@@ -13,6 +13,9 @@ const HomeRedirect = () => {
     if (!token) {
         return <Navigate to="/login" replace />;
     }
+    if (user?.role === "coach") {
+        return <Navigate to="/coach" replace />;
+    }
     if (user && user.tdee_onboarding_done === false) {
         return <Navigate to="/setup/tdee" replace />;
     }

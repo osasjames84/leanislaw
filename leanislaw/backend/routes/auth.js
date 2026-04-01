@@ -17,7 +17,7 @@ function stripPassword(userRow) {
 
 function signToken(user) {
     return jwt.sign(
-        { sub: user.id, email: user.email },
+        { sub: user.id, email: user.email, role: user.role },
         JWT_SECRET,
         { expiresIn: '7d' }
     );

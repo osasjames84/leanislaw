@@ -18,6 +18,8 @@ export const users = pgTable('users', {
   created_at: timestamp('created_at').defaultNow(), // account creation timestamp
   /** false = show TDEE onboarding after login/register; true = skip. */
   tdee_onboarding_done: boolean('tdee_onboarding_done').notNull().default(true),
+  /** Paid 1:1 coaching tier (Stripe webhook sets this in production). */
+  premium_coaching_active: boolean('premium_coaching_active').notNull().default(false),
 
 });
 
