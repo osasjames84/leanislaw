@@ -10,7 +10,7 @@ import strengthRouter from './routes/strength.js';
 import leaderboardRouter from './routes/leaderboard.js';
 import macrosRouter from './routes/macros.js';
 import chatRouter from './routes/chat.js';
-import coachingRouter from './routes/coaching.js';
+import coachingRouter, { handleStripeCoachingWebhook } from './routes/coaching.js';
 
 const app = express();
 const port = Number(process.env.PORT) || 4000;
@@ -19,6 +19,13 @@ const allowedOrigins = rawOrigins
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
+
+// Stripe coaching webhook must use raw body for signature verification (not JSON).
+app.post(
+    '/api/v1/coaching/stripe-webhook',
+    express.raw({ type: 'application/json' }),
+    handleStripeCoachingWebhook
+);
 
 app.use(express.json());
 

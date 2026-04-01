@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { authBearerHeaders } from "../apiHeaders";
 import CoachingHero from "../assets/coaching_hero.png";
@@ -26,12 +26,17 @@ const YEARLY_EFFECTIVE_MONTHLY = (YEARLY_GBP / 12).toFixed(2);
 
 const PremiumCoaching = () => {
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
     const { token, user, refreshUser } = useAuth();
     const [status, setStatus] = useState(null);
     const [loading, setLoading] = useState(true);
     const [unlocking, setUnlocking] = useState(false);
+    const [checkoutLoading, setCheckoutLoading] = useState(false);
     const [msg, setMsg] = useState("");
     const [billing, setBilling] = useState("yearly");
+
+    const checkoutEnabled = Boolean(status?.stripe_checkout_enabled);
+    const stripeWebhookOk = Boolean(status?.stripe_webhook_configured);
 
     useEffect(() => {
         if (!token) return;
@@ -41,6 +46,38 @@ const PremiumCoaching = () => {
             .catch(() => setStatus(null))
             .finally(() => setLoading(false));
     }, [token]);
+
+    const checkoutParam = searchParams.get("checkout");
+    useEffect(() => {
+        if (checkoutParam === "cancelled") {
+            setMsg("Checkout cancelled. You can try again anytime.");
+            setSearchParams({}, { replace: true });
+            return;
+        }
+        if (checkoutParam !== "success" || !token) return;
+
+        let cancelled = false;
+        const headers = authBearerHeaders(token);
+        const refresh = async () => {
+            await refreshUser?.();
+            const r = await fetch("/api/v1/coaching/status", { headers });
+            const data = await r.json().catch(() => ({}));
+            if (cancelled) return;
+            setStatus((s) => ({ ...s, ...data }));
+            if (data.premium_coaching_active) {
+                setMsg("Payment successful — premium coaching is active.");
+            } else {
+                setMsg(
+                    "Payment received. If access doesn’t show yet, wait a few seconds and pull to refresh or reopen this page."
+                );
+            }
+            setSearchParams({}, { replace: true });
+        };
+        refresh();
+        return () => {
+            cancelled = true;
+        };
+    }, [checkoutParam, token, refreshUser, setSearchParams]);
 
     const isCoach = user?.role === "coach";
     const hasPremium = Boolean(status?.premium_coaching_active);
@@ -63,6 +100,42 @@ const PremiumCoaching = () => {
             setMsg(e.message);
         } finally {
             setUnlocking(false);
+        }
+    };
+
+    const handleCheckout = async () => {
+        if (!token || !checkoutEnabled || checkoutLoading) return;
+        setCheckoutLoading(true);
+        setMsg("");
+        try {
+            const res = await fetch("/api/v1/coaching/create-checkout-session", {
+                method: "POST",
+                headers: { ...authBearerHeaders(token), "Content-Type": "application/json" },
+                body: JSON.stringify({ billing }),
+            });
+            const raw = await res.text();
+            let data = {};
+            try {
+                data = raw ? JSON.parse(raw) : {};
+            } catch {
+                /* non-JSON response (e.g. proxy HTML) */
+            }
+            if (!res.ok) {
+                const hint = data.hint ? ` ${data.hint}` : "";
+                throw new Error(
+                    (data.error || data.message || raw?.slice(0, 160) || `Request failed (${res.status})`) + hint
+                );
+            }
+            if (data.url) {
+                window.location.assign(data.url);
+                return;
+            }
+            throw new Error("No checkout URL returned");
+        } catch (e) {
+            const text = e instanceof Error ? e.message : String(e);
+            setMsg(text === "Failed to fetch" ? "Network error — check connection and that /api routes reach your backend." : text);
+        } finally {
+            setCheckoutLoading(false);
         }
     };
 
@@ -198,14 +271,31 @@ const PremiumCoaching = () => {
                     </div>
                 ) : (
                     <>
-                        <button type="button" style={payBtn} disabled>
-                            {billing === "monthly" && `Pay with card — £${MONTHLY_GBP}/month`}
-                            {billing === "semiannual" &&
-                                `Pay with card — £${SEMIANNUAL_GBP} every 6 months`}
-                            {billing === "yearly" && `Pay with card — £${YEARLY_GBP}/year`}
+                        <button
+                            type="button"
+                            style={{
+                                ...payBtn,
+                                ...(checkoutEnabled ? payBtnActive : {}),
+                            }}
+                            disabled={!checkoutEnabled || checkoutLoading}
+                            onClick={handleCheckout}
+                        >
+                            {checkoutLoading
+                                ? "Redirecting to Stripe…"
+                                : billing === "monthly"
+                                  ? `Pay with card — £${MONTHLY_GBP}/month`
+                                  : billing === "semiannual"
+                                    ? `Pay with card — £${SEMIANNUAL_GBP} every 6 months`
+                                    : `Pay with card — £${YEARLY_GBP}/year`}
                         </button>
                         <p style={stripeHint}>
-                            Stripe Checkout will be wired here. You&apos;ll set price and webhooks in Railway.
+                            {checkoutEnabled
+                                ? stripeWebhookOk
+                                    ? "Secure checkout with Stripe. Your coaching access turns on after payment completes."
+                                    : "Secure checkout with Stripe. If your access doesn’t show right away after paying, wait a minute and refresh this page."
+                                : import.meta.env.DEV
+                                  ? "Local dev: add Stripe env vars on the backend (see backend/HOSTING_BACKEND.md) to enable Pay."
+                                  : "Online checkout isn’t available yet — please check back soon."}
                         </p>
                         {import.meta.env.DEV || import.meta.env.VITE_SHOW_COACHING_DEV_UNLOCK === "true" ? (
                             <button
@@ -220,7 +310,19 @@ const PremiumCoaching = () => {
                     </>
                 )}
 
-                {msg ? <p style={{ color: msg.includes("unlock") ? "#047857" : "#b45309", fontSize: "0.88rem" }}>{msg}</p> : null}
+                {msg ? (
+                    <p
+                        style={{
+                            color:
+                                /successful|subscribed|unlock|Payment received|active/i.test(msg)
+                                    ? "#047857"
+                                    : "#b45309",
+                            fontSize: "0.88rem",
+                        }}
+                    >
+                        {msg}
+                    </p>
+                ) : null}
             </div>
 
             <p style={footer}>
@@ -450,7 +552,11 @@ const payBtn = {
     fontWeight: 800,
     fontSize: "1rem",
     cursor: "not-allowed",
-    opacity: 0.85,
+    opacity: 0.5,
+};
+const payBtnActive = {
+    cursor: "pointer",
+    opacity: 1,
 };
 
 const stripeHint = {
