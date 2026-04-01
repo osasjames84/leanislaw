@@ -14,7 +14,6 @@ const topRow = { display: "flex", alignItems: "center", justifyContent: "space-b
 const tiny = { margin: "0 0 6px", fontSize: "0.95rem", color: "#007aff", fontWeight: "600" };
 const title = { margin: 0, fontSize: "2.1rem", fontWeight: "800", letterSpacing: "-0.4px", color: "#000" };
 const sectionTitle = { margin: "18px 0 12px", fontSize: "2rem", fontWeight: "800", letterSpacing: "-0.5px", color: "#000" };
-const h2 = { margin: "20px 0 10px", fontSize: "2rem", fontWeight: "800", letterSpacing: "-0.3px", color: "#000" };
 const h3 = { margin: "14px 0 10px", fontSize: "1.15rem", fontWeight: "800", color: "#1c1c1e" };
 const watchCard = { borderRadius: 14, border: "0.5px solid #d1d1d6", background: "#fff", padding: "12px 12px 10px" };
 const watchLead = { margin: "0 0 6px", fontSize: "1rem", fontWeight: "700", color: "#1c1c1e" };
@@ -280,7 +279,7 @@ const WorkoutHub = () => {
                                 <button type="button" style={menuDot} onClick={(e) => e.stopPropagation()}>…</button>
                             </div>
                             <p style={tSub}>{subText(t)}</p>
-                            <p style={tMeta}>◷ {new Date(t.date || Date.now()).toLocaleDateString()}</p>
+                            <p style={tMeta}>◷ {new Date(t.date || 0).toLocaleDateString()}</p>
                         </div>
                     ))}
                 </div>
@@ -301,7 +300,7 @@ const WorkoutHub = () => {
                                 <button type="button" style={menuDot} onClick={(e) => e.stopPropagation()}>…</button>
                             </div>
                             <p style={tSub}>{subText(w)}</p>
-                            <p style={tMeta}>◷ {new Date(w.date || Date.now()).toLocaleDateString()}</p>
+                            <p style={tMeta}>◷ {new Date(w.date || 0).toLocaleDateString()}</p>
                         </div>
                     ))}
                 </div>

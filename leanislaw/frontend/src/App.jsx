@@ -7,6 +7,9 @@ import WorkoutSession from "./components/WorkoutSession";
 import AboutPage from "./components/AboutPage";
 import Login from "./components/Login";
 import Register from "./components/Register";
+import CheckEmail from "./components/CheckEmail";
+import VerifyEmail from "./components/VerifyEmail";
+import ForgotPassword from "./components/ForgotPassword";
 import ProtectedRoute from "./components/ProtectedRoute";
 import HomeRedirect from "./components/HomeRedirect";
 import TdeeCalculator from "./components/TdeeCalculator";
@@ -37,6 +40,9 @@ const App = () => {
             <Route path="/" element={<HomeRedirect />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/check-email" element={<CheckEmail />} />
+            <Route path="/verify-email" element={<VerifyEmail />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/about" element={<AboutPage />} />
             <Route
               element={

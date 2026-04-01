@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { ageFromDateOfBirth, MIN_REGISTER_AGE, MAX_REGISTER_AGE } from "../utils/registerRules";
 
 const Register = () => {
     const navigate = useNavigate();
@@ -25,6 +26,19 @@ const Register = () => {
         setError("");
         setSubmitting(true);
         try {
+            const age = ageFromDateOfBirth(form.date_of_birth);
+            if (age == null) {
+                setError("Use a valid date of birth (not in the future).");
+                return;
+            }
+            if (age < MIN_REGISTER_AGE) {
+                setError(`You must be at least ${MIN_REGISTER_AGE} years old to register.`);
+                return;
+            }
+            if (age > MAX_REGISTER_AGE) {
+                setError("Please enter a valid date of birth.");
+                return;
+            }
             const u = await register({
                 first_name: form.first_name.trim(),
                 last_name: form.last_name.trim(),
@@ -33,6 +47,10 @@ const Register = () => {
                 date_of_birth: form.date_of_birth,
                 role: "client",
             });
+            if (u?.needsVerification) {
+                navigate(`/check-email?email=${encodeURIComponent(u.email || "")}`, { replace: true });
+                return;
+            }
             const needsSetup = u && u.tdee_onboarding_done === false;
             navigate(needsSetup ? "/setup/tdee" : "/dashboard", { replace: true });
         } catch (err) {
@@ -51,7 +69,7 @@ const Register = () => {
                     <p style={subtitle}>Join Lean is Law</p>
                 </div>
 
-                <form onSubmit={handleSubmit} style={form}>
+                <form onSubmit={handleSubmit} style={formStyle}>
                     {error && <div style={errorBanner} role="alert">{error}</div>}
 
                     <div style={nameRow}>
@@ -161,7 +179,7 @@ const backLink = { color: "#007aff", fontWeight: "600", fontSize: "0.9rem", text
 const title = { margin: 0, fontSize: "1.45rem", fontWeight: "800", letterSpacing: "-0.4px", color: "#000" };
 const subtitle = { margin: "6px 0 0", fontSize: "0.95rem", color: "#8e8e93", fontWeight: "500" };
 
-const form = { display: "flex", flexDirection: "column" };
+const formStyle = { display: "flex", flexDirection: "column" };
 const nameRow = { display: "flex", gap: 12 };
 const fieldGroup = { flex: 1, display: "flex", flexDirection: "column" };
 

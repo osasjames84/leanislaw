@@ -101,8 +101,6 @@ const MacroTracking = () => {
     const [foods, setFoods] = useState([]);
     const [foodQuery, setFoodQuery] = useState("");
     const [picked, setPicked] = useState(null);
-    /** Always stored in grams; input shows g or oz from settings. */
-    const [portionGrams, setPortionGrams] = useState(200);
     const [amountCount, setAmountCount] = useState("1");
     const [servingSizeGrams, setServingSizeGrams] = useState(100);
 
@@ -382,7 +380,6 @@ const MacroTracking = () => {
         setPickerStep("list");
         setPicked(null);
         setFoodQuery("");
-        setPortionGrams(200);
         setAmountCount("1");
         setServingSizeGrams(100);
         setTimeout(() => loadFoods(""), 0);
@@ -418,11 +415,6 @@ const MacroTracking = () => {
         () => Math.round(amountNum * Number(servingSizeGrams || 0) * 100) / 100,
         [amountNum, servingSizeGrams]
     );
-
-    useEffect(() => {
-        if (!foodPickerOpen || pickerStep !== "grams") return;
-        setPortionGrams(totalPickerGrams);
-    }, [foodPickerOpen, pickerStep, totalPickerGrams]);
 
     const pickerMacroPreview = useMemo(() => {
         if (!picked || !Number.isFinite(Number(picked.kcal_per_100g))) return null;
@@ -1799,25 +1791,6 @@ const btnGhost = {
     fontWeight: "700",
     fontSize: "0.9rem",
     cursor: "pointer",
-};
-
-const label = {
-    display: "block",
-    fontSize: "0.68rem",
-    fontWeight: "800",
-    color: "#8e8e93",
-    textTransform: "uppercase",
-    marginBottom: 6,
-};
-
-const input = {
-    width: "100%",
-    boxSizing: "border-box",
-    padding: "14px 16px",
-    fontSize: "1rem",
-    border: "1px solid #e5e5ea",
-    borderRadius: 12,
-    marginBottom: 14,
 };
 
 const coach = {

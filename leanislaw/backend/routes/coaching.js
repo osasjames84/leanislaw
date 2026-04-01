@@ -117,7 +117,7 @@ router.post('/dev/unlock-premium', requireAuth, async (req, res) => {
             .where(eq(users.id, req.userId));
         const rows = await db.select().from(users).where(eq(users.id, req.userId)).limit(1);
         if (!rows.length) return res.status(404).json({ error: 'User not found' });
-        const { password_hash, ...safe } = rows[0];
+        const { password_hash, email_verification_token, password_reset_code_hash, ...safe } = rows[0];
         res.json({ ok: true, user: safe });
     } catch (err) {
         res.status(500).json({ error: err.message });

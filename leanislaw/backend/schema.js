@@ -21,6 +21,17 @@ export const users = pgTable('users', {
   /** Paid 1:1 coaching tier (Stripe webhook sets this in production). */
   premium_coaching_active: boolean('premium_coaching_active').notNull().default(false),
 
+  email_verified: boolean('email_verified').notNull().default(false),
+  /** HMAC hash of 6-digit registration verification code. */
+  email_verification_token: varchar('email_verification_token', { length: 128 }),
+  email_verification_expires_at: timestamp('email_verification_expires_at'),
+  email_verification_sent_at: timestamp('email_verification_sent_at'),
+
+  password_reset_code_hash: varchar('password_reset_code_hash', { length: 128 }),
+  password_reset_expires_at: timestamp('password_reset_expires_at'),
+  password_reset_sent_at: timestamp('password_reset_sent_at'),
+  failed_login_count: integer('failed_login_count').notNull().default(0),
+
 });
 
 // Exercises table

@@ -62,10 +62,9 @@ export function macrosFromCaloriePercents(targetKcal, proteinPct, carbsPct, fatP
     const cPct = Number(carbsPct);
     const fPct = Number(fatPct);
     const s = pPct + cPct + fPct;
-    const norm = s > 0 ? s / 100 : 1;
-    const pK = (T * pPct) / norm;
-    const cK = (T * cPct) / norm;
-    const fK = (T * fPct) / norm;
+    const safeSum = s > 0 ? s : 100;
+    const pK = (T * pPct) / safeSum;
+    const fK = (T * fPct) / safeSum;
     let protein_g = Math.max(0, Math.round(pK / 4));
     let fat_g = Math.max(0, Math.round(fK / 9));
     let rem = T - 4 * protein_g - 9 * fat_g;

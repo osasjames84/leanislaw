@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import ChadPhoto from "../assets/creator_photo.png";
 
@@ -12,11 +12,15 @@ const Login = () => {
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState("");
+    const [verifyEmailHref, setVerifyEmailHref] = useState("");
+    const [forgotHint, setForgotHint] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError("");
+        setVerifyEmailHref("");
+        setForgotHint(false);
         setSubmitting(true);
         try {
             const u = await login(email.trim(), password);
@@ -34,7 +38,17 @@ const Login = () => {
             const needsSetup = u && u.tdee_onboarding_done === false;
             navigate(needsSetup ? "/setup/tdee" : "/dashboard", { replace: true });
         } catch (err) {
-            setError(err.message || "Something went wrong. Try again.");
+            if (err.code === "EMAIL_NOT_VERIFIED") {
+                const q = encodeURIComponent(email.trim());
+                setError(
+                    `Verify your email first. Enter the code we sent, or resend from the check-email screen.`
+                );
+                setVerifyEmailHref(`/check-email?email=${q}`);
+            } else {
+                setVerifyEmailHref("");
+                setForgotHint(Boolean(err.suggestPasswordReset));
+                setError(err.message || "Something went wrong. Try again.");
+            }
         } finally {
             setSubmitting(false);
         }
@@ -54,7 +68,44 @@ const Login = () => {
                 </div>
 
                 <form onSubmit={handleSubmit} style={form}>
-                    {error && <div style={errorBanner} role="alert">{error}</div>}
+                    {location.state?.passwordResetOk ? (
+                        <div
+                            style={{
+                                ...errorBanner,
+                                backgroundColor: "#ecfdf5",
+                                color: "#047857",
+                                border: "1px solid #a7f3d0",
+                                marginBottom: 16,
+                            }}
+                            role="status"
+                        >
+                            Password updated. Sign in with your new password.
+                        </div>
+                    ) : null}
+                    {error && (
+                        <div style={errorBanner} role="alert">
+                            {error}
+                            {verifyEmailHref ? (
+                                <div style={{ marginTop: 10 }}>
+                                    <Link to={verifyEmailHref} style={link}>Resend verification code</Link>
+                                </div>
+                            ) : null}
+                            {forgotHint && !verifyEmailHref ? (
+                                <div style={{ marginTop: 10 }}>
+                                    <Link
+                                        to={
+                                            email.trim()
+                                                ? `/forgot-password?email=${encodeURIComponent(email.trim())}`
+                                                : "/forgot-password"
+                                        }
+                                        style={link}
+                                    >
+                                        Reset password with email code
+                                    </Link>
+                                </div>
+                            ) : null}
+                        </div>
+                    )}
 
                     <label style={label} htmlFor="login-email">Email</label>
                     <input
@@ -97,6 +148,18 @@ const Login = () => {
                     >
                         {submitting ? "Signing in…" : "Sign in"}
                     </button>
+                    <p style={{ textAlign: "center", margin: "14px 0 0", fontSize: "0.9rem" }}>
+                        <Link
+                            to={
+                                email.trim()
+                                    ? `/forgot-password?email=${encodeURIComponent(email.trim())}`
+                                    : "/forgot-password"
+                            }
+                            style={link}
+                        >
+                            Forgot password?
+                        </Link>
+                    </p>
                 </form>
 
                 <p style={footerLine}>

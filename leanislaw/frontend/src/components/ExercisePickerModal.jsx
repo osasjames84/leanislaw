@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 
 const ExercisePickerModal = ({ onClose, onConfirm, allExercises }) => {
   const [searchTerm, setSearchTerm] = useState("");

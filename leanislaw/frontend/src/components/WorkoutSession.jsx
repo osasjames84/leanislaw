@@ -32,10 +32,9 @@ const WorkoutSession = () => {
     const [allExercises, setAllExercises] = useState([]); 
     const [isTemplate, setIsTemplate] = useState(false);
     const [showSummary, setShowSummary] = useState(false);
-    const [workoutCount, setWorkoutCount] = useState(0);
     const [currentRank, setCurrentRank] = useState("SUB-5");
-    const [now, setNow] = useState(Date.now());
-    const [sessionStartTime] = useState(Date.now());
+    const [now, setNow] = useState(0);
+    const [sessionStartTime] = useState(() => Date.now());
     
     // 1. New Modal UI State
     const [showPicker, setShowPicker] = useState(false);
@@ -73,7 +72,6 @@ const WorkoutSession = () => {
             .then((res) => res.json())
             .then((data) => {
                 if (Array.isArray(data)) {
-                    setWorkoutCount(data.length);
                     setCurrentRank(getChadRank(data.length));
                 }
             })
@@ -81,6 +79,7 @@ const WorkoutSession = () => {
     }, [id, token]);
 
     useEffect(() => {
+        setNow(Date.now());
         const interval = setInterval(() => {
             setNow(Date.now());
         }, 1000);

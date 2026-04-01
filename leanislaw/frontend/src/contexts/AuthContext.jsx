@@ -61,7 +61,11 @@ export function AuthProvider({ children }) {
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-            throw new Error(data.error || "Login failed");
+            const err = new Error(data.error || "Login failed");
+            if (data.code) err.code = data.code;
+            if (data.suggestPasswordReset) err.suggestPasswordReset = true;
+            if (data.failedLoginCount != null) err.failedLoginCount = data.failedLoginCount;
+            throw err;
         }
         localStorage.setItem(TOKEN_KEY, data.token);
         setToken(data.token);
@@ -78,6 +82,9 @@ export function AuthProvider({ children }) {
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
             throw new Error(data.error || "Registration failed");
+        }
+        if (!data.token) {
+            return { needsVerification: true, email: data.email };
         }
         localStorage.setItem(TOKEN_KEY, data.token);
         setToken(data.token);
