@@ -1,0 +1,9 @@
+{
+  "name": "leanislaw-repo",
+  "private": true,
+  "description": "Railway: set Root Directory to repo root OR to leanislaw — both work.",
+  "scripts": {
+    "postinstall": "npm install --prefix leanislaw",
+    "start": "npm start --prefix leanislaw"
+  }
+}

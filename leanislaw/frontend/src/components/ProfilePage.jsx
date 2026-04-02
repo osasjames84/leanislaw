@@ -75,7 +75,7 @@ export default function ProfilePage() {
                     res.status === 401
                         ? "Sign in again — your session may have expired."
                         : res.status === 404
-                          ? "Friends API not found. Redeploy the API from the latest code (includes /api/v1/social)."
+                          ? "Friends API missing on the server (404). In Railway: Redeploy latest main, set Root Directory to leanislaw (or repo root with root package.json), and run migration 015."
                           : res.status === 503
                             ? "Database may need migration 015 (user_friendships). On Railway: redeploy so startup migrations run, or run npm run migrate with DATABASE_URL."
                             : res.status === 403

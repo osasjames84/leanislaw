@@ -1,0 +1,6 @@
+# When Railway Root Directory = `leanislaw`, Nixpacks uses this app’s package.json + start.
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "npm start"
