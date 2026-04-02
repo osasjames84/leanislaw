@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import {
@@ -18,27 +18,33 @@ const Login = () => {
     const { login } = useAuth();
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const passwordRef = useRef(null);
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState("");
     const [verifyEmailHref, setVerifyEmailHref] = useState("");
     const [forgotHint, setForgotHint] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setError("");
-        setVerifyEmailHref("");
-        setForgotHint(false);
-        setSubmitting(true);
+    useLayoutEffect(() => {
+        if (!rnWeb || !passwordRef.current) return;
         try {
-            const u = await login(email.trim(), password);
+            passwordRef.current.style.webkitTextSecurity = showPassword ? "none" : "disc";
+        } catch {
+            /* ignore */
+        }
+    }, [rnWeb, showPassword]);
+
+    const navigateAfterLogin = useCallback(
+        (u) => {
             if (u?.username_setup_done === false) {
                 navigate("/setup/username", { replace: true });
                 return;
             }
             if (coachMode) {
                 if (u?.role !== "coach") {
-                    throw new Error("This sign-in is for coach accounts only. Use the regular sign in for clients.");
+                    throw new Error(
+                        "This sign-in is for coach accounts only. Use the regular sign in for clients.",
+                    );
                 }
                 navigate("/coach", { replace: true });
                 return;
@@ -49,6 +55,80 @@ const Login = () => {
             }
             const needsSetup = u && u.tdee_onboarding_done === false;
             navigate(needsSetup ? "/setup/tdee" : "/dashboard", { replace: true });
+        },
+        [coachMode, navigate],
+    );
+
+    const inFlightSimRef = useRef(false);
+    const runSimAutoLogin = useCallback(async () => {
+        if (typeof window === "undefined") return;
+        if (!isReactNativeWebView() || coachMode) return;
+        const raw = window.__LEANISLAW_SIM_AUTO_LOGIN;
+        if (!raw?.email || raw.password == null || raw.password === "") return;
+        if (inFlightSimRef.current) return;
+        inFlightSimRef.current = true;
+
+        const emailC = raw.email;
+        const passC = String(raw.password);
+
+        setError("");
+        setVerifyEmailHref("");
+        setForgotHint(false);
+        setEmail(emailC);
+        if (passwordRef.current) {
+            passwordRef.current.value = passC;
+        }
+        setSubmitting(true);
+        try {
+            const u = await login(emailC.trim(), passC);
+            delete window.__LEANISLAW_SIM_AUTO_LOGIN;
+            navigateAfterLogin(u);
+        } catch (err) {
+            if (import.meta.env.DEV) {
+                console.warn("[leanislaw] iOS sim auto-login failed:", err?.message || err);
+            }
+            if (err.code === "EMAIL_NOT_VERIFIED") {
+                const q = encodeURIComponent(String(emailC).trim());
+                setError(
+                    `Verify your email first. Enter the code we sent, or resend from the check-email screen.`,
+                );
+                setVerifyEmailHref(`/check-email?email=${q}`);
+            } else {
+                setVerifyEmailHref("");
+                setForgotHint(Boolean(err.suggestPasswordReset));
+                setError(err.message || "Something went wrong. Try again.");
+            }
+        } finally {
+            inFlightSimRef.current = false;
+            setSubmitting(false);
+        }
+    }, [coachMode, login, navigateAfterLogin]);
+
+    useEffect(() => {
+        const h = () => {
+            void runSimAutoLogin();
+        };
+        window.addEventListener("leanislaw-sim-autologin", h);
+        void runSimAutoLogin();
+        return () => window.removeEventListener("leanislaw-sim-autologin", h);
+    }, [runSimAutoLogin]);
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setError("");
+        setVerifyEmailHref("");
+        setForgotHint(false);
+        const pwd = rnWeb
+            ? String(passwordRef.current?.value ?? "").trim()
+            : password.trim();
+        if (!pwd) {
+            setError("Enter your password.");
+            return;
+        }
+        setSubmitting(true);
+        try {
+            const u = await login(email.trim(), pwd);
+            navigateAfterLogin(u);
         } catch (err) {
             if (err.code === "EMAIL_NOT_VERIFIED") {
                 const q = encodeURIComponent(email.trim());
@@ -132,20 +212,37 @@ const Login = () => {
                     />
 
                     <label style={{ ...label, marginTop: 14 }} htmlFor="login-password">Password</label>
-                    <input
-                        id="login-password"
-                        type={passwordInputTypeForWebView(rnWeb, showPassword)}
-                        autoComplete={rnWeb ? "off" : "current-password"}
-                        autoCapitalize="off"
-                        autoCorrect="off"
-                        spellCheck={false}
-                        style={mergePasswordFieldStyle(field, rnWeb, showPassword)}
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="••••••••"
-                        required
-                        {...rnWebPasswordExtraProps(rnWeb)}
-                    />
+                    {rnWeb ? (
+                        <input
+                            ref={passwordRef}
+                            id="login-password"
+                            type="text"
+                            inputMode="text"
+                            name="password"
+                            autoComplete="off"
+                            autoCapitalize="off"
+                            autoCorrect="off"
+                            spellCheck={false}
+                            style={{ ...field, WebkitTextSecurity: showPassword ? "none" : "disc" }}
+                            defaultValue=""
+                            placeholder="••••••••"
+                            {...rnWebPasswordExtraProps(rnWeb)}
+                        />
+                    ) : (
+                        <input
+                            id="login-password"
+                            type={passwordInputTypeForWebView(rnWeb, showPassword)}
+                            autoComplete="current-password"
+                            autoCapitalize="off"
+                            autoCorrect="off"
+                            spellCheck={false}
+                            style={mergePasswordFieldStyle(field, rnWeb, showPassword)}
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="••••••••"
+                            required
+                        />
+                    )}
 
                     <label style={showRow}>
                         <input

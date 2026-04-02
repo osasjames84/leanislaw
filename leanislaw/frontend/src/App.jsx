@@ -26,6 +26,7 @@ import CoachChat from "./components/CoachChat";
 import CoachRoute from "./components/CoachRoute";
 import CoachDashboard from "./components/CoachDashboard";
 import PremiumCoaching from "./components/PremiumCoaching";
+import ProfilePage from "./components/ProfilePage";
 import { AuthProvider } from "./contexts/AuthContext";
 import { UnitsProvider } from "./contexts/UnitsContext";
 import { ActiveWorkoutProvider } from "./contexts/ActiveWorkoutContext";
@@ -54,6 +55,7 @@ const App = () => {
               }
             >
               <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/profile" element={<ProfilePage />} />
               <Route path="/insights" element={<InsightsPage />} />
               <Route path="/insights/:metric" element={<InsightDetailPage />} />
               <Route path="/log/calories" element={<LogCalories />} />

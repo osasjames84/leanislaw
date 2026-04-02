@@ -1,11 +1,6 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import {
-    isReactNativeWebView,
-    mergePasswordFieldStyle,
-    passwordInputTypeForWebView,
-    rnWebPasswordExtraProps,
-} from "../lib/rnWebView";
+import { isReactNativeWebView, rnWebPasswordExtraProps } from "../lib/rnWebView";
 
 const ForgotPassword = () => {
     const rnWeb = isReactNativeWebView();
@@ -16,6 +11,8 @@ const ForgotPassword = () => {
     const [code, setCode] = useState("");
     const [password, setPassword] = useState("");
     const [password2, setPassword2] = useState("");
+    const passwordRef = useRef(null);
+    const password2Ref = useRef(null);
     const [step, setStep] = useState(1);
     const [info, setInfo] = useState("");
     const [error, setError] = useState("");
@@ -56,11 +53,13 @@ const ForgotPassword = () => {
     const reset = async (e) => {
         e.preventDefault();
         setError("");
-        if (password !== password2) {
+        const p = rnWeb ? String(passwordRef.current?.value ?? "") : password;
+        const p2 = rnWeb ? String(password2Ref.current?.value ?? "") : password2;
+        if (p !== p2) {
             setError("Passwords don’t match.");
             return;
         }
-        if (password.length < 6) {
+        if (p.length < 6) {
             setError("Password must be at least 6 characters.");
             return;
         }
@@ -72,7 +71,7 @@ const ForgotPassword = () => {
                 body: JSON.stringify({
                     email: email.trim().toLowerCase(),
                     code,
-                    new_password: password,
+                    new_password: p,
                 }),
             });
             const data = await res.json().catch(() => ({}));
@@ -140,37 +139,67 @@ const ForgotPassword = () => {
                         <label style={{ ...label, marginTop: 12 }} htmlFor="fp-pass">
                             New password
                         </label>
-                        <input
-                            id="fp-pass"
-                            type={passwordInputTypeForWebView(rnWeb, false)}
-                            autoComplete={rnWeb ? "off" : "new-password"}
-                            autoCapitalize="off"
-                            autoCorrect="off"
-                            spellCheck={false}
-                            style={mergePasswordFieldStyle(field, rnWeb, false)}
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            minLength={6}
-                            required
-                            {...rnWebPasswordExtraProps(rnWeb)}
-                        />
+                        {rnWeb ? (
+                            <input
+                                ref={passwordRef}
+                                id="fp-pass"
+                                type="text"
+                                inputMode="text"
+                                autoComplete="off"
+                                autoCapitalize="off"
+                                autoCorrect="off"
+                                spellCheck={false}
+                                style={{ ...field, WebkitTextSecurity: "disc" }}
+                                defaultValue=""
+                                {...rnWebPasswordExtraProps(rnWeb)}
+                            />
+                        ) : (
+                            <input
+                                id="fp-pass"
+                                type="password"
+                                autoComplete="new-password"
+                                autoCapitalize="off"
+                                autoCorrect="off"
+                                spellCheck={false}
+                                style={field}
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                minLength={6}
+                                required
+                            />
+                        )}
                         <label style={{ ...label, marginTop: 12 }} htmlFor="fp-pass2">
                             Confirm password
                         </label>
-                        <input
-                            id="fp-pass2"
-                            type={passwordInputTypeForWebView(rnWeb, false)}
-                            autoComplete={rnWeb ? "off" : "new-password"}
-                            autoCapitalize="off"
-                            autoCorrect="off"
-                            spellCheck={false}
-                            style={mergePasswordFieldStyle(field, rnWeb, false)}
-                            value={password2}
-                            onChange={(e) => setPassword2(e.target.value)}
-                            minLength={6}
-                            required
-                            {...rnWebPasswordExtraProps(rnWeb)}
-                        />
+                        {rnWeb ? (
+                            <input
+                                ref={password2Ref}
+                                id="fp-pass2"
+                                type="text"
+                                inputMode="text"
+                                autoComplete="off"
+                                autoCapitalize="off"
+                                autoCorrect="off"
+                                spellCheck={false}
+                                style={{ ...field, WebkitTextSecurity: "disc" }}
+                                defaultValue=""
+                                {...rnWebPasswordExtraProps(rnWeb)}
+                            />
+                        ) : (
+                            <input
+                                id="fp-pass2"
+                                type="password"
+                                autoComplete="new-password"
+                                autoCapitalize="off"
+                                autoCorrect="off"
+                                spellCheck={false}
+                                style={field}
+                                value={password2}
+                                onChange={(e) => setPassword2(e.target.value)}
+                                minLength={6}
+                                required
+                            />
+                        )}
                         {error ? (
                             <p style={{ ...p, marginTop: 12, color: "#b45309" }} role="alert">
                                 {error}
@@ -196,6 +225,8 @@ const ForgotPassword = () => {
                                 setCode("");
                                 setPassword("");
                                 setPassword2("");
+                                if (passwordRef.current) passwordRef.current.value = "";
+                                if (password2Ref.current) password2Ref.current.value = "";
                                 setInfo("");
                                 setError("");
                             }}

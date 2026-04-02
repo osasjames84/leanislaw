@@ -1,5 +1,19 @@
 // schema.js
-import { pgTable, serial, text, jsonb, boolean, varchar, integer, date, pgEnum, timestamp, numeric, unique } from 'drizzle-orm/pg-core';
+import {
+  pgTable,
+  serial,
+  text,
+  jsonb,
+  boolean,
+  varchar,
+  integer,
+  date,
+  pgEnum,
+  timestamp,
+  numeric,
+  unique,
+  primaryKey,
+} from 'drizzle-orm/pg-core';
 import { relations} from 'drizzle-orm';
 // Enums
 export const userRole = pgEnum('user_role', ['coach', 'client']);
@@ -40,6 +54,21 @@ export const users = pgTable('users', {
   profile_image_url: text('profile_image_url'),
 
 });
+
+/** Undirected edge: always store with user_a_id < user_b_id (see social routes). */
+export const userFriendships = pgTable(
+  'user_friendships',
+  {
+    user_a_id: integer('user_a_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    user_b_id: integer('user_b_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    created_at: timestamp('created_at').defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.user_a_id, t.user_b_id] })]
+);
 
 // Exercises table
 export const exercises = pgTable('exercises', {

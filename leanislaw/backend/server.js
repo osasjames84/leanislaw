@@ -13,6 +13,7 @@ import macrosRouter from './routes/macros.js';
 import chatRouter from './routes/chat.js';
 import chessRouter from './routes/chess.js';
 import coachingRouter, { handleStripeCoachingWebhook } from './routes/coaching.js';
+import socialRouter from './routes/social.js';
 
 const app = express();
 const port = Number(process.env.PORT) || 4000;
@@ -63,6 +64,7 @@ app.use('/api/v1/macros', macrosRouter);
 app.use('/api/v1/chat', chatRouter);
 app.use('/api/v1/chess', chessRouter);
 app.use('/api/v1/coaching', coachingRouter);
+app.use('/api/v1/social', socialRouter);
 app.use('/api/v1/users', usersRouter);
 app.use('/api/v1/exercises', exercisesRouter);
 app.use('/api/v1/workoutSessions', workoutSessionsRouter);

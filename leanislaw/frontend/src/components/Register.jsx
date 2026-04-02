@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import {
@@ -20,9 +20,19 @@ const Register = () => {
         password: "",
         date_of_birth: "",
     });
+    const passwordRef = useRef(null);
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState("");
     const [submitting, setSubmitting] = useState(false);
+
+    useLayoutEffect(() => {
+        if (!rnWeb || !passwordRef.current) return;
+        try {
+            passwordRef.current.style.webkitTextSecurity = showPassword ? "none" : "disc";
+        } catch {
+            /* ignore */
+        }
+    }, [rnWeb, showPassword]);
 
     const handleChange = (field) => (e) => {
         setForm((f) => ({ ...f, [field]: e.target.value }));
@@ -46,11 +56,18 @@ const Register = () => {
                 setError("Please enter a valid date of birth.");
                 return;
             }
+            const pwd = rnWeb
+                ? String(passwordRef.current?.value ?? "")
+                : form.password;
+            if (pwd.length < 6) {
+                setError("Password must be at least 6 characters.");
+                return;
+            }
             const u = await register({
                 first_name: form.first_name.trim(),
                 last_name: form.last_name.trim(),
                 email: form.email.trim(),
-                password: form.password,
+                password: pwd,
                 date_of_birth: form.date_of_birth,
                 role: "client",
             });
@@ -129,19 +146,35 @@ const Register = () => {
                     />
 
                     <label style={{ ...label, marginTop: 12 }}>Password</label>
-                    <input
-                        type={passwordInputTypeForWebView(rnWeb, showPassword)}
-                        style={mergePasswordFieldStyle(field, rnWeb, showPassword)}
-                        value={form.password}
-                        onChange={handleChange("password")}
-                        minLength={6}
-                        autoComplete={rnWeb ? "off" : "new-password"}
-                        autoCapitalize="off"
-                        autoCorrect="off"
-                        spellCheck={false}
-                        required
-                        {...rnWebPasswordExtraProps(rnWeb)}
-                    />
+                    {rnWeb ? (
+                        <input
+                            ref={passwordRef}
+                            type="text"
+                            inputMode="text"
+                            name="new-password"
+                            autoComplete="off"
+                            autoCapitalize="off"
+                            autoCorrect="off"
+                            spellCheck={false}
+                            style={{ ...field, WebkitTextSecurity: showPassword ? "none" : "disc" }}
+                            defaultValue=""
+                            placeholder="At least 6 characters"
+                            {...rnWebPasswordExtraProps(rnWeb)}
+                        />
+                    ) : (
+                        <input
+                            type={passwordInputTypeForWebView(rnWeb, showPassword)}
+                            style={mergePasswordFieldStyle(field, rnWeb, showPassword)}
+                            value={form.password}
+                            onChange={handleChange("password")}
+                            minLength={6}
+                            autoComplete="new-password"
+                            autoCapitalize="off"
+                            autoCorrect="off"
+                            spellCheck={false}
+                            required
+                        />
+                    )}
 
                     <label style={showRow}>
                         <input

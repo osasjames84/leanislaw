@@ -1,6 +1,35 @@
-/** Set early by `leanislawmobile` WebView injection (see App.js). */
+/**
+ * Lean Is Law mobile shell (react-native-webview): detection + password-field helpers.
+ * Query `?leanislaw_rn=1` is appended to the WebView entry URL; we also persist in sessionStorage
+ * so client-side navigations still see the host as RN WebView before the injected global runs.
+ */
+function bootstrapLeanislawRnHost() {
+    if (typeof window === "undefined") return;
+    try {
+        if (window.__LEANISLAW_RN_WEBVIEW === true) {
+            sessionStorage.setItem("leanislaw_rn", "1");
+            return;
+        }
+        const q = new URLSearchParams(window.location.search).get("leanislaw_rn");
+        if (q === "1") {
+            window.__LEANISLAW_RN_WEBVIEW = true;
+            sessionStorage.setItem("leanislaw_rn", "1");
+            return;
+        }
+        if (sessionStorage.getItem("leanislaw_rn") === "1") {
+            window.__LEANISLAW_RN_WEBVIEW = true;
+        }
+    } catch {
+        /* private mode, blocked storage */
+    }
+}
+
+bootstrapLeanislawRnHost();
+
 export function isReactNativeWebView() {
-    return typeof window !== "undefined" && window.__LEANISLAW_RN_WEBVIEW === true;
+    if (typeof window === "undefined") return false;
+    bootstrapLeanislawRnHost();
+    return window.__LEANISLAW_RN_WEBVIEW === true;
 }
 
 /**

@@ -10,16 +10,56 @@ import {
 import { WebView } from "react-native-webview";
 import { StatusBar } from "expo-status-bar";
 import Constants from "expo-constants";
+import * as Device from "expo-device";
 
 /** Prefer `extra` from app.config.js (reliable with `.env.local`) then Metro-inlined env. */
-const WEB_URL = String(
+const WEB_BASE = String(
   Constants.expoConfig?.extra?.webUrl ||
     process.env.EXPO_PUBLIC_WEB_URL ||
     "http://localhost:5173",
 ).replace(/\/$/, "");
 
-/** Sets `window.__LEANISLAW_RN_WEBVIEW` before page scripts run (see web `src/lib/rnWebView.js`). */
-const INJECT_BEFORE_CONTENT = `window.__LEANISLAW_RN_WEBVIEW=true;true;`;
+/** Entry URL signals RN WebView host (`rnWebView.js` + sessionStorage) so SPA routes still apply fixes. */
+function webEntryUri(base) {
+  try {
+    const u = new URL(base);
+    u.searchParams.set("leanislaw_rn", "1");
+    return u.toString();
+  } catch {
+    const sep = base.includes("?") ? "&" : "?";
+    return `${base}${sep}leanislaw_rn=1`;
+  }
+}
+
+const WEB_ENTRY_URI = webEntryUri(WEB_BASE);
+
+const simCreds = Constants.expoConfig?.extra?.simAutoLogin;
+const simForce = Boolean(Constants.expoConfig?.extra?.simAutoLoginForce);
+const useSimAutoLogin =
+  Platform.OS === "ios" &&
+  simCreds?.email &&
+  simCreds.password != null &&
+  String(simCreds.password) !== "" &&
+  (!Device.isDevice || simForce);
+
+const simCredsJson = useSimAutoLogin
+  ? JSON.stringify({
+      email: simCreds.email,
+      password: simCreds.password,
+    })
+  : "";
+
+const simLoginInject = simCredsJson
+  ? `try{window.__LEANISLAW_SIM_AUTO_LOGIN=${simCredsJson};}catch(_){}`
+  : "";
+
+/** After document loads, set creds again + notify (fixes Strict Mode / injection ordering). */
+const SIM_LOGIN_INJECT_AFTER_LOAD = simCredsJson
+  ? `try{window.__LEANISLAW_SIM_AUTO_LOGIN=${simCredsJson};window.dispatchEvent(new Event('leanislaw-sim-autologin'));}catch(_){}`
+  : "";
+
+/** Sets RN host + optional iOS Simulator auto-login creds before page JS (see web `Login.jsx`). */
+const INJECT_BEFORE_CONTENT = `window.__LEANISLAW_RN_WEBVIEW=true;${simLoginInject};true;`;
 
 const fillScreen = {
   position: "absolute",
@@ -55,7 +95,7 @@ export default function App() {
         <View style={styles.errorPanel}>
           <Text style={styles.errorTitle}>Could not load the app</Text>
           <Text style={styles.errorUrl} selectable>
-            {WEB_URL}
+            {WEB_BASE}
           </Text>
           <Text style={styles.errorHint}>
             {Platform.OS === "android"
@@ -80,12 +120,15 @@ export default function App() {
       ) : null}
       <WebView
         ref={webRef}
-        source={{ uri: WEB_URL }}
+        source={{ uri: WEB_ENTRY_URI }}
         startInLoadingState
         injectedJavaScriptBeforeContentLoaded={INJECT_BEFORE_CONTENT}
         onLoadEnd={() => {
           loadOkRef.current = true;
           setLoadError(null);
+          if (SIM_LOGIN_INJECT_AFTER_LOAD) {
+            webRef.current?.injectJavaScript(`${SIM_LOGIN_INJECT_AFTER_LOAD};true;`);
+          }
         }}
         onError={(e) => {
           const ev = e?.nativeEvent;
@@ -100,7 +143,7 @@ export default function App() {
           const u = ne?.url || "";
           let origin = "";
           try {
-            origin = new URL(WEB_URL).origin;
+            origin = new URL(WEB_BASE).origin;
           } catch {
             /* ignore */
           }
@@ -116,14 +159,14 @@ export default function App() {
               useSharedProcessPool: false,
               /** Strong Password / accessory bar uses native bridges that often crash with secure fields. */
               hideKeyboardAccessoryView: true,
-              keyboardDisplayRequiresUserAction: false,
+              keyboardDisplayRequiresUserAction: true,
             }
           : { nestedScrollEnabled: true })}
         renderLoading={() => (
           <View style={styles.loading}>
             <ActivityIndicator size="large" color="#fff" />
             <Text style={styles.loadingHint} selectable>
-              {WEB_URL}
+              {WEB_BASE}
             </Text>
           </View>
         )}

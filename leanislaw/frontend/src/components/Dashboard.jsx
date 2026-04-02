@@ -11,18 +11,7 @@ import CreatorPhoto from "../assets/creator_photo.png";
 import Sub5Image from "../assets/sub5.png";
 import DashboardInsights from "./DashboardInsights";
 import { userAvatarUrl } from "../lib/userAvatar";
-
-// Simple rank helper based on total logged workouts
-const getChadRank = (workoutCount) => {
-  if (workoutCount === 0) return "SUBHUMAN";
-  if (workoutCount < 5) return "SUB-5";
-  if (workoutCount < 50) return "LTN";
-  if (workoutCount < 100) return "MTN";
-  if (workoutCount < 200) return "HTN";
-  if (workoutCount < 300) return "CHAD LITE";
-  if (workoutCount >= 300) return "CHAD";
-  return "SUB-5";
-};
+import { getChadRank } from "../lib/chadRank";
 
 const Dashboard = () => {
   const [templates, setTemplates] = useState([]);
@@ -95,13 +84,20 @@ const Dashboard = () => {
       <header style={{ ...dashboardHeaderStyle, zIndex: settingsOpen ? 200 : 10 }}>
         <div style={headerIdentityRow}>
           {user ? (
-            <img
-              src={userAvatarUrl(user)}
-              alt=""
-              width={48}
-              height={48}
-              style={headerProfileImg}
-            />
+            <button
+              type="button"
+              aria-label="Open profile"
+              onClick={() => navigate("/profile")}
+              style={headerAvatarBtn}
+            >
+              <img
+                src={userAvatarUrl(user)}
+                alt=""
+                width={48}
+                height={48}
+                style={headerProfileImg}
+              />
+            </button>
           ) : null}
           <div style={{ flex: 1, minWidth: 0 }}>
           <h1 style={dashboardTitleStyle}>Lean is Law</h1>
@@ -333,11 +329,22 @@ const headerIdentityRow = {
   minWidth: 0,
 };
 
+const headerAvatarBtn = {
+  padding: 0,
+  margin: 0,
+  border: "none",
+  background: "none",
+  cursor: "pointer",
+  borderRadius: 12,
+  flexShrink: 0,
+  lineHeight: 0,
+};
+
 const headerProfileImg = {
   borderRadius: 12,
   border: "1px solid #d1d1d6",
   objectFit: "cover",
-  flexShrink: 0,
+  display: "block",
 };
 
 const dashboardTitleStyle = { margin: 0, fontSize: '1.4rem', fontWeight: '900', color: '#000', letterSpacing: '-0.5px' };
