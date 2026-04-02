@@ -25,7 +25,7 @@ const CoachDashboard = () => {
             style={{
                 minHeight: "100vh",
                 background: "#f2f2f7",
-                padding: "20px 16px calc(88px + env(safe-area-inset-bottom, 0px))",
+                padding: "calc(20px + env(safe-area-inset-top, 0px)) 16px calc(88px + env(safe-area-inset-bottom, 0px))",
                 fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif',
             }}
         >

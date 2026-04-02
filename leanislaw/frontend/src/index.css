@@ -4,12 +4,20 @@
   box-sizing: border-box;
 }
 
+html,
+body,
+#root {
+  height: 100%;
+  min-height: 100dvh;
+}
+
 body {
-  font-family: Arial, sans-serif ;
+  font-family: Arial, sans-serif;
   background-color: #f0f0f0;
   color: #333;
   line-height: 1.5;
-  padding: 20px ;
+  padding: 0;
+  margin: 0;
 }
 
 h1 {

@@ -2,18 +2,36 @@ import express from 'express';
 import { db } from '../db.js';
 const app = express()
 import { exercises } from '../schema.js';
-import { eq, lt, gte, gt, ne } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { ilike } from 'drizzle-orm';
-import { body_part } from '../schema.js';
 
 app.use(express.json());
 const router = express.Router();
+
+/** Trim, collapse spaces, lowercase — used to detect duplicate exercise names. */
+function normalizeExerciseName(name) {
+  return String(name ?? '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
+}
+
+/** Keep one row per (normalized name, body_part); prefer lowest id (oldest / stable for FKs). */
+function dedupeExerciseRows(rows) {
+  const byKey = new Map();
+  for (const r of rows) {
+    const k = `${normalizeExerciseName(r.name)}|${r.body_part}`;
+    const prev = byKey.get(k);
+    if (!prev || Number(r.id) < Number(prev.id)) byKey.set(k, r);
+  }
+  return Array.from(byKey.values());
+}
 
 // Get all exercises
 router.get('/', async (req, res) => {
   try {
     const allExercises = await db.select().from(exercises);
-    res.json(allExercises);
+    res.json(dedupeExerciseRows(allExercises));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -29,11 +47,12 @@ router.get('/part/:body_part', async (req, res) => {
       .from(exercises)
       .where(eq(exercises.body_part, body_part.toLowerCase()));
 
-    if (exercisesByCategory.length === 0) {
+    const deduped = dedupeExerciseRows(exercisesByCategory);
+    if (deduped.length === 0) {
       return res.status(404).json({ error: 'No exercises found for this body part' });
     }
 
-    res.json(exercisesByCategory);
+    res.json(deduped);
   } catch (err) {
     console.error(err);
     res.status(400).json({ error: err.message });
@@ -69,27 +88,36 @@ router.get('/exerciseName/:name', async (req, res) => {
         if(!name){
             res.status(404).json({error: 'Not Found'});
         }
-        res.json(exerciseName);
+        res.json(dedupeExerciseRows(exerciseName));
     } catch(err){
         res.status(400).json({error: err.message});
     }
 })
 
 router.post('/', async (req , res) =>{
-    const {name, body_part} = req.body;
-    //If name and body part absent then error missing fields
-    if(!name || !body_part){
+    const {name, body_part: bp} = req.body;
+    if(!name || !bp){
         return res.status(404).json({error: 'Missing Fields'});
     }
-    //New exerise inserts the name and body
-    const newExercise = await db.insert(exercises).values({name, body_part}).returning();
+    const displayName = String(name).trim().replace(/\s+/g, ' ');
+    const norm = normalizeExerciseName(displayName);
 
-    //If it is null then return error
+    const samePart = await db.select().from(exercises).where(eq(exercises.body_part, bp));
+    const existing = samePart.find((e) => normalizeExerciseName(e.name) === norm);
+    if (existing) {
+      return res.status(200).json({
+        message: `Exercise already exists`,
+        exercises: [existing],
+      });
+    }
+
+    const newExercise = await db.insert(exercises).values({ name: displayName, body_part: bp }).returning();
+
     if(!newExercise || newExercise.length === 0){
         return res.status(500).json({ error: "Failed to insert exercise" });
     }
     res.status(201).json({
-      message: `Exercise ${name}`,
+      message: `Exercise ${displayName}`,
       exercises: newExercise
     })
 });

@@ -329,6 +329,10 @@ router.post('/reset-password', async (req, res) => {
                 password_reset_expires_at: null,
                 password_reset_sent_at: null,
                 failed_login_count: 0,
+                /** Reset via inbox proves email access — same as verification. */
+                email_verified: true,
+                email_verification_token: null,
+                email_verification_expires_at: null,
             })
             .where(eq(users.id, u.id));
         res.json({ ok: true });

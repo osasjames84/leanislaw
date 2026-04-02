@@ -7,14 +7,17 @@ const AboutPage = () => {
   const navigate = useNavigate();
 
   return (
-    <div style={containerStyle}>
-      <header style={headerStyle}>
-        <button onClick={() => navigate(-1)} style={backBtnStyle}>✕</button>
+    <div style={pageWrap}>
+      <header style={navBarStyle}>
+        <button type="button" onClick={() => navigate(-1)} style={backBtnStyle} aria-label="Close">
+          ✕
+        </button>
         <h1 style={headerTitle}>True Chad</h1>
-        <div style={{ width: '24px' }}></div> 
+        <div style={navBarSpacer} aria-hidden />
       </header>
 
-      <div style={profileCard}>
+      <div style={scrollArea}>
+        <div style={profileCard}>
         {/* The updated square wrapper */}
         <div style={imageWrapperSquare}>
           <img src={CreatorPhoto} alt="The Way of the Chad" style={imageStyleSquare} />
@@ -24,9 +27,9 @@ const AboutPage = () => {
           <span style={statusBadge}>ASCENDED</span>
           <span style={rankBadge}>ELITE II</span>
         </div>
-      </div>
+        </div>
 
-      <div style={manifestoCard}>
+        <div style={manifestoCard}>
         <h3 style={labelStyle}>MOG OR BE MOGGED</h3>
         <p style={mainQuoteStyle}>
           "Lean is Law. <br /> 
@@ -44,9 +47,9 @@ const AboutPage = () => {
           To become a chad, there is only one choice, 
           <strong> ASCEND.</strong>
         </p>
-      </div>
+        </div>
 
-      <div style={footerStyle}>
+        <div style={footerStyle}>
         <p style={footerText}>THE LAW IS ABSOLUTE. THE ASCENT IS MANDATORY.</p>
         <button 
             style={actionBtn} 
@@ -54,17 +57,63 @@ const AboutPage = () => {
         >
             ASCEND
         </button>
+        </div>
       </div>
     </div>
   );
 };
 
 // --- ELITE CHAD STYLES ---
-const containerStyle = { backgroundColor: "#f2f2f7", minHeight: "100vh", padding: "20px", fontFamily: '-apple-system, sans-serif' };
+const pageWrap = {
+  minHeight: "100vh",
+  height: "100dvh",
+  display: "flex",
+  flexDirection: "column",
+  backgroundColor: "#f2f2f7",
+  fontFamily: '-apple-system, sans-serif',
+  boxSizing: "border-box",
+};
 
-const headerStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "30px" };
-const backBtnStyle = { background: "none", border: "none", fontSize: "1.5rem", color: "#8e8e93", cursor: "pointer" };
-const headerTitle = { fontSize: "0.8rem", fontWeight: "800", textTransform: 'uppercase', letterSpacing: '2px', color: '#8e8e93' };
+const navBarStyle = {
+  flexShrink: 0,
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  padding: "calc(12px + env(safe-area-inset-top, 0px)) 16px 12px",
+  backgroundColor: "#fff",
+  borderBottom: "0.5px solid #d1d1d6",
+  zIndex: 10,
+};
+
+const navBarSpacer = { width: 24, flexShrink: 0 };
+
+const scrollArea = {
+  flex: 1,
+  minHeight: 0,
+  overflowY: "auto",
+  WebkitOverflowScrolling: "touch",
+  padding: "24px 20px calc(28px + env(safe-area-inset-bottom, 0px))",
+  boxSizing: "border-box",
+};
+
+const backBtnStyle = {
+  background: "none",
+  border: "none",
+  fontSize: "1.5rem",
+  color: "#8e8e93",
+  cursor: "pointer",
+  lineHeight: 1,
+  padding: 4,
+  margin: "-4px",
+};
+const headerTitle = {
+  margin: 0,
+  fontSize: "0.8rem",
+  fontWeight: "800",
+  textTransform: "uppercase",
+  letterSpacing: "2px",
+  color: "#8e8e93",
+};
 
 const profileCard = { display: "flex", flexDirection: "column", alignItems: "center", marginBottom: "40px" };
 

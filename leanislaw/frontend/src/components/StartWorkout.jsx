@@ -85,7 +85,7 @@ const StartWorkout = () => {
 };
 
 const pageContainer = { backgroundColor: "#f2f2f7", minHeight: "100vh", fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' };
-const headerStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px", backgroundColor: "#fff", borderBottom: "0.5px solid #d1d1d6", position: "sticky", top: 0, zIndex: 5 };
+const headerStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(14px + env(safe-area-inset-top, 0px)) 16px 14px", backgroundColor: "#fff", borderBottom: "0.5px solid #d1d1d6", position: "sticky", top: 0, zIndex: 5 };
 const backBtn = { fontSize: "1.25rem", color: "#262626", cursor: "pointer", padding: "4px", lineHeight: 1 };
 const headerTitle = { fontSize: "1rem", fontWeight: "600", margin: 0, color: "#262626" };
 const headerSpacer = { width: 28 };

@@ -305,7 +305,7 @@ const containerStyle = {
 
 const dashboardHeaderStyle = { 
   display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
-  padding: '20px', backgroundColor: '#fff', borderBottom: '0.5px solid #d1d1d6',
+  padding: 'calc(20px + env(safe-area-inset-top, 0px)) 20px 20px', backgroundColor: '#fff', borderBottom: '0.5px solid #d1d1d6',
   position: 'sticky', top: 0, zIndex: 10
 };
 

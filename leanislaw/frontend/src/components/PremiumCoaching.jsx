@@ -380,7 +380,7 @@ const PremiumCoaching = () => {
 const page = {
     minHeight: "100vh",
     background: "#f2f2f7",
-    padding: "14px 16px calc(88px + env(safe-area-inset-bottom, 0px))",
+    padding: "calc(14px + env(safe-area-inset-top, 0px)) 16px calc(88px + env(safe-area-inset-bottom, 0px))",
     fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif',
     boxSizing: "border-box",
 };

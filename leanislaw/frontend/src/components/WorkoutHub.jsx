@@ -1,18 +1,71 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { authBearerHeaders } from "../apiHeaders";
 
-const page = {
+/** After this scroll offset (px), show inline title in the nav (iOS large-title collapse). */
+const NAV_TITLE_SCROLL_THRESHOLD = 48;
+
+const pageWrap = {
     minHeight: "100vh",
+    height: "100dvh",
     backgroundColor: "#f2f2f7",
     fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif',
-    padding: "14px 16px calc(98px + env(safe-area-inset-bottom, 0px))",
+    boxSizing: "border-box",
+    display: "flex",
+    flexDirection: "column",
+    overflow: "hidden",
+};
+
+const navBar = {
+    flexShrink: 0,
+    position: "relative",
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    padding: "calc(12px + env(safe-area-inset-top, 0px)) 16px 10px",
+    backgroundColor: "#f2f2f7",
+    borderBottom: "0.5px solid #d1d1d6",
+    zIndex: 20,
+};
+
+const navKicker = {
+    margin: 0,
+    fontSize: "0.95rem",
+    color: "#007aff",
+    fontWeight: "600",
+    flexShrink: 0,
+    position: "relative",
+    zIndex: 1,
+};
+
+const navInlineTitle = {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    textAlign: "center",
+    margin: 0,
+    fontSize: "1.05rem",
+    fontWeight: "800",
+    letterSpacing: "-0.2px",
+    color: "#000",
+    pointerEvents: "none",
+    transition: "opacity 0.18s ease",
+};
+
+const navHomeBtn = { flexShrink: 0, marginLeft: "auto", position: "relative", zIndex: 1 };
+
+const scrollArea = {
+    flex: 1,
+    minHeight: 0,
+    overflowY: "auto",
+    WebkitOverflowScrolling: "touch",
+    touchAction: "pan-y",
+    padding: "8px 16px calc(98px + env(safe-area-inset-bottom, 0px))",
     boxSizing: "border-box",
 };
-const topRow = { display: "flex", alignItems: "center", justifyContent: "space-between" };
-const tiny = { margin: "0 0 6px", fontSize: "0.95rem", color: "#007aff", fontWeight: "600" };
-const title = { margin: 0, fontSize: "2.1rem", fontWeight: "800", letterSpacing: "-0.4px", color: "#000" };
+
+const title = { margin: "4px 0 12px", fontSize: "2.1rem", fontWeight: "800", letterSpacing: "-0.4px", color: "#000" };
 const sectionTitle = { margin: "18px 0 12px", fontSize: "2rem", fontWeight: "800", letterSpacing: "-0.5px", color: "#000" };
 const h3 = { margin: "14px 0 10px", fontSize: "1.15rem", fontWeight: "800", color: "#1c1c1e" };
 const watchCard = { borderRadius: 14, border: "0.5px solid #d1d1d6", background: "#fff", padding: "12px 12px 10px" };
@@ -114,6 +167,15 @@ const WorkoutHub = () => {
     const { token } = useAuth();
     const [templates, setTemplates] = useState([]);
     const [history, setHistory] = useState([]);
+    const [navTitleVisible, setNavTitleVisible] = useState(false);
+
+    const onScrollMain = useCallback((e) => {
+        const y = e.currentTarget.scrollTop;
+        setNavTitleVisible((prev) => {
+            const next = y > NAV_TITLE_SCROLL_THRESHOLD;
+            return prev === next ? prev : next;
+        });
+    }, []);
 
     useEffect(() => {
         if (!token) return;
@@ -153,8 +215,9 @@ const WorkoutHub = () => {
                             body: JSON.stringify({ name: cfg.createName, body_part: cfg.body_part }),
                         });
                         const created = await createRes.json().catch(() => null);
-                        if (Array.isArray(created?.exercises) && created.exercises[0]) {
-                            exercises = [...exercises, created.exercises[0]];
+                        const row = created?.exercises?.[0];
+                        if (row && !exercises.some((e) => Number(e.id) === Number(row.id))) {
+                            exercises = [...exercises, row];
                         }
                     }
                 }
@@ -244,12 +307,25 @@ const WorkoutHub = () => {
             : (t?.notes?.trim() || "Tap to open this workout");
 
     return (
-        <div style={page}>
-            <p style={tiny}>New in 6.0</p>
-            <div style={topRow}>
+        <div style={pageWrap}>
+            <header style={navBar}>
+                <p style={navKicker}>New in 6.0</p>
+                <h2
+                    style={{
+                        ...navInlineTitle,
+                        opacity: navTitleVisible ? 1 : 0,
+                    }}
+                    aria-hidden={!navTitleVisible}
+                >
+                    Start Workout
+                </h2>
+                <button type="button" onClick={() => navigate("/dashboard")} style={{ ...chip, ...navHomeBtn }}>
+                    Home
+                </button>
+            </header>
+
+            <div style={scrollArea} onScroll={onScrollMain}>
                 <h1 style={title}>Start Workout</h1>
-                <button type="button" onClick={() => navigate("/dashboard")} style={chip}>Home</button>
-            </div>
 
             <h3 style={h3}>Workout on Apple Watch</h3>
             <div style={watchCard}>
@@ -307,6 +383,7 @@ const WorkoutHub = () => {
             ) : (
                 <div style={emptyCard}>No workout history yet. Start an empty workout to populate this list.</div>
             )}
+            </div>
         </div>
     );
 };

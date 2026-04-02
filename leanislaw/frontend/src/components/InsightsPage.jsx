@@ -11,7 +11,7 @@ const page = {
     boxSizing: "border-box",
     backgroundColor: "#f2f2f7",
     padding:
-        "12px 16px calc(28px + 62px + env(safe-area-inset-bottom, 0px))",
+        "calc(12px + env(safe-area-inset-top, 0px)) 16px calc(28px + 62px + env(safe-area-inset-bottom, 0px))",
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
 };
 

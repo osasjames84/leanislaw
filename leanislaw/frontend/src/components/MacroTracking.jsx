@@ -310,6 +310,32 @@ const MacroTracking = () => {
         return () => clearTimeout(t);
     }, [foodQuery, loadFoods, foodPickerOpen]);
 
+    /** iOS WKWebView: prevent page zoom + scroll jank while food sheet is open (fixes clipped Close). */
+    useEffect(() => {
+        if (!foodPickerOpen) return;
+        const scrollY = window.scrollY;
+        const prev = {
+            overflow: document.body.style.overflow,
+            position: document.body.style.position,
+            top: document.body.style.top,
+            width: document.body.style.width,
+        };
+        document.body.style.overflow = "hidden";
+        document.body.style.position = "fixed";
+        document.body.style.top = `-${scrollY}px`;
+        document.body.style.width = "100%";
+        const prevHtmlOverflow = document.documentElement.style.overflow;
+        document.documentElement.style.overflow = "hidden";
+        return () => {
+            document.body.style.overflow = prev.overflow;
+            document.body.style.position = prev.position;
+            document.body.style.top = prev.top;
+            document.body.style.width = prev.width;
+            document.documentElement.style.overflow = prevHtmlOverflow;
+            window.scrollTo(0, scrollY);
+        };
+    }, [foodPickerOpen]);
+
     const entriesByMeal = useMemo(() => {
         const map = Object.fromEntries(MEALS.map((m) => [m.id, []]));
         for (const e of dayData?.entries ?? []) {
@@ -1157,16 +1183,16 @@ const MacroTracking = () => {
                             <button type="button" style={pickerBack} onClick={closeFoodPicker}>
                                 Close
                             </button>
-                            <span style={pickerTitle}>
+                            <h2 style={pickerTitle}>
                                 {pickerStep === "list"
                                     ? `Add to ${MEALS.find((x) => x.id === pickerMeal)?.label ?? "meal"}`
                                     : "Amount"}
-                            </span>
-                            <span style={{ width: 56 }} />
+                            </h2>
+                            <div style={pickerHeadSpacer} aria-hidden />
                         </div>
 
                         {pickerStep === "list" ? (
-                            <>
+                            <div style={pickerListStepWrap}>
                                 <input
                                     style={pickerSearch}
                                     placeholder="Search foods…"
@@ -1207,9 +1233,10 @@ const MacroTracking = () => {
                                         </button>
                                     ))}
                                 </div>
-                            </>
+                            </div>
                         ) : (
-                            <div style={gramsWrap}>
+                            <>
+                                <div style={pickerGramsScroll}>
                                 <p style={{ margin: "0 0 8px", fontWeight: "700" }}>{picked?.name}</p>
                                 <div style={formRow}>
                                     <label style={rowLabel}>Amount</label>
@@ -1219,7 +1246,9 @@ const MacroTracking = () => {
                                         onChange={(e) => setAmountCount(e.target.value)}
                                         inputMode="decimal"
                                         placeholder="1"
-                                        autoFocus
+                                        autoCorrect="off"
+                                        autoCapitalize="off"
+                                        spellCheck={false}
                                     />
                                 </div>
                                 <div style={formRow}>
@@ -1288,20 +1317,23 @@ const MacroTracking = () => {
                                         <p style={pickerSummaryLine}>USDA item will still be logged using full detail on save.</p>
                                     )}
                                 </div>
-                                <button type="button" style={btn} onClick={addFood} disabled={adding}>
-                                    {adding ? "Adding…" : "Add to diary"}
-                                </button>
-                                <button
-                                    type="button"
-                                    style={btnGhost}
-                                    onClick={() => {
-                                        setPickerStep("list");
-                                        setPicked(null);
-                                    }}
-                                >
-                                    Back to list
-                                </button>
-                            </div>
+                                </div>
+                                <div style={pickerGramsFooter}>
+                                    <button type="button" style={btn} onClick={addFood} disabled={adding}>
+                                        {adding ? "Adding…" : "Add to diary"}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        style={{ ...btnGhost, marginTop: 0 }}
+                                        onClick={() => {
+                                            setPickerStep("list");
+                                            setPicked(null);
+                                        }}
+                                    >
+                                        Back to list
+                                    </button>
+                                </div>
+                            </>
                         )}
                     </div>
                 </div>
@@ -1322,7 +1354,7 @@ const header = {
     alignItems: "center",
     justifyContent: "space-between",
     gap: 8,
-    padding: "10px 12px",
+    padding: "calc(14px + env(safe-area-inset-top, 0px)) 12px 12px",
     backgroundColor: "#fff",
     borderBottom: "0.5px solid #d1d1d6",
     position: "sticky",
@@ -1815,27 +1847,33 @@ const pickerBackdrop = {
     display: "flex",
     alignItems: "flex-end",
     justifyContent: "center",
+    boxSizing: "border-box",
 };
 
 const pickerSheet = {
     width: "100%",
     maxWidth: 520,
-    maxHeight: "85vh",
+    /* Use vh only: dvh/svh shift when iOS UI chrome changes and can feel like a "zoom" */
+    maxHeight: "min(88vh, calc(100vh - env(safe-area-inset-top, 0px) - 24px))",
     background: "#fff",
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     display: "flex",
     flexDirection: "column",
     overflow: "hidden",
+    boxSizing: "border-box",
+    touchAction: "manipulation",
 };
 
 const pickerHead = {
-    display: "flex",
+    display: "grid",
+    gridTemplateColumns: "1fr auto 1fr",
     alignItems: "center",
-    justifyContent: "space-between",
+    columnGap: 8,
     padding: "12px 14px",
     borderBottom: "1px solid #e5e5ea",
     flexShrink: 0,
+    background: "#fff",
 };
 
 const pickerBack = {
@@ -1845,26 +1883,55 @@ const pickerBack = {
     fontWeight: "600",
     fontSize: "1rem",
     cursor: "pointer",
-    padding: 4,
+    padding: "6px 4px",
+    justifySelf: "start",
+    lineHeight: 1.2,
 };
 
-const pickerTitle = { fontWeight: "800", fontSize: "0.95rem" };
+const pickerTitle = {
+    margin: 0,
+    fontWeight: "800",
+    fontSize: "0.95rem",
+    textAlign: "center",
+    lineHeight: 1.2,
+    minWidth: 0,
+    maxWidth: "70vw",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    gridColumn: 2,
+};
+
+const pickerHeadSpacer = { width: 56, justifySelf: "end", gridColumn: 3 };
+
+const pickerListStepWrap = {
+    flex: 1,
+    minHeight: 0,
+    display: "flex",
+    flexDirection: "column",
+    overflow: "hidden",
+};
 
 const pickerSearch = {
     margin: "12px 14px 8px",
     padding: "12px 14px",
-    fontSize: "1rem",
+    /* ≥16px prevents iOS focus zoom in WKWebView */
+    fontSize: "16px",
     border: "1px solid #e5e5ea",
     borderRadius: 12,
     boxSizing: "border-box",
     width: "calc(100% - 28px)",
     alignSelf: "center",
+    flexShrink: 0,
 };
 
 const pickerList = {
     flex: 1,
+    minHeight: 0,
     overflowY: "auto",
-    padding: "0 0 16px",
+    WebkitOverflowScrolling: "touch",
+    touchAction: "pan-y",
+    padding: "0 0 calc(16px + env(safe-area-inset-bottom, 0px))",
 };
 
 const pickerFoodRow = {
@@ -1880,7 +1947,25 @@ const pickerFoodRow = {
     gap: 4,
 };
 
-const gramsWrap = { padding: 20 };
+const pickerGramsScroll = {
+    flex: 1,
+    minHeight: 0,
+    overflowY: "auto",
+    WebkitOverflowScrolling: "touch",
+    touchAction: "pan-y",
+    padding: "20px 20px 8px",
+    boxSizing: "border-box",
+};
+
+const pickerGramsFooter = {
+    flexShrink: 0,
+    padding: "12px 20px calc(16px + env(safe-area-inset-bottom, 0px))",
+    borderTop: "1px solid #e5e5ea",
+    background: "#fff",
+    display: "flex",
+    flexDirection: "column",
+    gap: 10,
+};
 const formRow = {
     display: "flex",
     alignItems: "center",
@@ -1897,7 +1982,8 @@ const smallInput = {
     width: 170,
     boxSizing: "border-box",
     padding: "10px 12px",
-    fontSize: "0.95rem",
+    fontSize: "16px",
+    lineHeight: 1.25,
     border: "1px solid #e5e5ea",
     borderRadius: 10,
     background: "#fff",

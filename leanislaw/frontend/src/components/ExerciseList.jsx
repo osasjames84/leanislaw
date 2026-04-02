@@ -19,7 +19,11 @@ const ExerciseList = () => {
   const addExerciseToState = (response) => {
     const newExercise = response?.exercises?.[0] || response;
     if (newExercise && (newExercise.name || newExercise.body_part)) {
-      setExercises((prevExercises) => [...prevExercises, newExercise]);
+      setExercises((prevExercises) =>
+        prevExercises.some((e) => e.id === newExercise.id)
+          ? prevExercises
+          : [...prevExercises, newExercise]
+      );
       setShowAddModal(false);
     }
   };
@@ -94,7 +98,7 @@ const ExerciseList = () => {
 };
 // --- STYLES (Ensure these are all present) ---
 const containerStyle = { backgroundColor: "#f2f2f7", minHeight: "100vh", padding: "0 16px", fontFamily: '-apple-system, sans-serif' };
-const headerStyle = { position: "sticky", top: 0, backgroundColor: "#f2f2f7", padding: "10px 0", zIndex: 10 };
+const headerStyle = { position: "sticky", top: 0, backgroundColor: "#f2f2f7", padding: "calc(10px + env(safe-area-inset-top, 0px)) 0 10px", zIndex: 10 };
 
 const navRow = { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "5px" };
 const backBtnStyle = { background: "none", border: "none", fontSize: "1.5rem", color: "#8e8e93", cursor: "pointer", padding: "5px 0" };

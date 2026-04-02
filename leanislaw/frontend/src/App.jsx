@@ -3,7 +3,7 @@ import Dashboard from "./components/Dashboard";
 import ExerciseList from "./components/ExerciseList";
 import { useState } from "react";
 import StartWorkout from "./components/StartWorkout";
-import WorkoutSession from "./components/WorkoutSession";
+import WorkoutArea from "./components/WorkoutArea";
 import AboutPage from "./components/AboutPage";
 import Login from "./components/Login";
 import Register from "./components/Register";
@@ -19,7 +19,6 @@ import LogCalories from "./components/LogCalories";
 import LogWeight from "./components/LogWeight";
 import Leaderboard from "./components/Leaderboard";
 import MacroTracking from "./components/MacroTracking";
-import WorkoutHub from "./components/WorkoutHub";
 import InsightsPage from "./components/InsightsPage";
 import InsightDetailPage from "./components/InsightDetailPage";
 import CoachChat from "./components/CoachChat";
@@ -28,6 +27,7 @@ import CoachDashboard from "./components/CoachDashboard";
 import PremiumCoaching from "./components/PremiumCoaching";
 import { AuthProvider } from "./contexts/AuthContext";
 import { UnitsProvider } from "./contexts/UnitsContext";
+import { ActiveWorkoutProvider } from "./contexts/ActiveWorkoutContext";
 
 const App = () => {
   const [exercises, setExercises] = useState([]);
@@ -36,7 +36,8 @@ const App = () => {
     <Router>
       <AuthProvider>
         <UnitsProvider>
-          <Routes>
+          <ActiveWorkoutProvider>
+            <Routes>
             <Route path="/" element={<HomeRedirect />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
@@ -59,7 +60,8 @@ const App = () => {
               <Route path="/log/weight" element={<LogWeight />} />
               <Route path="/leaderboard" element={<Leaderboard />} />
               <Route path="/tdee" element={<TdeeCalculator />} />
-              <Route path="/workout" element={<WorkoutHub />} />
+              <Route path="/workout/:sessionId" element={<WorkoutArea />} />
+              <Route path="/workout" element={<WorkoutArea />} />
               <Route path="/chat" element={<CoachChat />} />
               <Route path="/premium-coaching" element={<PremiumCoaching />} />
               <Route
@@ -88,14 +90,6 @@ const App = () => {
               }
             />
             <Route
-              path="/workout/:id"
-              element={
-                <ProtectedRoute>
-                  <WorkoutSession />
-                </ProtectedRoute>
-              }
-            />
-            <Route
               path="/setup/tdee"
               element={
                 <ProtectedRoute>
@@ -103,7 +97,8 @@ const App = () => {
                 </ProtectedRoute>
               }
             />
-          </Routes>
+            </Routes>
+          </ActiveWorkoutProvider>
         </UnitsProvider>
       </AuthProvider>
     </Router>

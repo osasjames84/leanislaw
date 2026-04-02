@@ -797,7 +797,7 @@ const header = {
     display: "grid",
     gridTemplateColumns: "1fr auto 1fr",
     alignItems: "center",
-    padding: "10px 12px",
+    padding: "calc(10px + env(safe-area-inset-top, 0px)) 12px 10px",
     borderBottom: "0.5px solid #d1d1d6",
     background: "#fff",
 };

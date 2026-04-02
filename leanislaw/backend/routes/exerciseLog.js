@@ -83,16 +83,40 @@ router.post('/', requireAuth, async (req, res) => {
         const userId = uid(req);
         const { workout_sessions_id, exercise_id } = req.body;
         const sid = Number(workout_sessions_id);
+        const eid = Number(exercise_id);
+        if (!Number.isFinite(eid)) {
+            return res.status(400).json({ error: 'Invalid exercise_id' });
+        }
         const ok = await sessionOwnedByUser(sid, userId);
         if (!ok) {
             return res.status(404).json({ error: 'Session not found' });
+        }
+
+        const existing = await db
+            .select({
+                id: exerciseLog.id,
+                exercise_id: exerciseLog.exercise_id,
+                sets: exerciseLog.sets,
+                name: exercises.name,
+            })
+            .from(exerciseLog)
+            .leftJoin(exercises, eq(exerciseLog.exercise_id, exercises.id))
+            .where(and(eq(exerciseLog.workoutSessionsId, sid), eq(exerciseLog.exercise_id, eid)))
+            .limit(1);
+
+        if (existing.length > 0) {
+            const log = existing[0];
+            return res.status(200).json({
+                ...log,
+                sets: Array.isArray(log.sets) ? log.sets : [],
+            });
         }
 
         const [newLog] = await db
             .insert(exerciseLog)
             .values({
                 workoutSessionsId: sid,
-                exercise_id: Number(exercise_id),
+                exercise_id: eid,
                 sets: [],
             })
             .returning();

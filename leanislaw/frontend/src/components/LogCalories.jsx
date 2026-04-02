@@ -141,7 +141,7 @@ const header = {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: "14px 16px",
+    padding: "calc(14px + env(safe-area-inset-top, 0px)) 16px 14px",
     backgroundColor: "#fff",
     borderBottom: "0.5px solid #d1d1d6",
     position: "sticky",
