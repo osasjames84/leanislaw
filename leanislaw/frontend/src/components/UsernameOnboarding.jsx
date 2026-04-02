@@ -3,6 +3,7 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { authBearerHeaders } from "../apiHeaders";
 import { normalizeUsernameClient, usernameRulesText } from "../lib/usernameRules";
+import { needsUsernameOnboarding } from "../lib/usernameOnboarding";
 
 const nextPathAfterUsername = (user) => {
     if (!user) return "/dashboard";
@@ -62,7 +63,7 @@ const UsernameOnboarding = () => {
         );
     }
 
-    if (user.username_setup_done !== false) {
+    if (!needsUsernameOnboarding(user)) {
         return <Navigate to={nextPathAfterUsername(user)} replace />;
     }
 

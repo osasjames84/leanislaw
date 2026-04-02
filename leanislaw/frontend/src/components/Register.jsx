@@ -8,6 +8,7 @@ import {
     rnWebPasswordExtraProps,
 } from "../lib/rnWebView";
 import { ageFromDateOfBirth, MIN_REGISTER_AGE, MAX_REGISTER_AGE } from "../utils/registerRules";
+import { needsUsernameOnboarding } from "../lib/usernameOnboarding";
 
 const Register = () => {
     const rnWeb = isReactNativeWebView();
@@ -78,7 +79,7 @@ const Register = () => {
                 });
                 return;
             }
-            if (u?.username_setup_done === false) {
+            if (needsUsernameOnboarding(u)) {
                 navigate("/setup/username", { replace: true });
                 return;
             }

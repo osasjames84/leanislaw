@@ -7,6 +7,7 @@ import {
     KG_PER_LB,
     LBS_PER_KG,
 } from "../units";
+import { needsUsernameOnboarding } from "../lib/usernameOnboarding";
 
 const ALLOW_REPEAT_TDEE =
     typeof import.meta !== "undefined" && import.meta.env?.VITE_ALLOW_TDEE_REPEAT === "true";
@@ -336,7 +337,7 @@ const TdeeOnboarding = () => {
         );
     }
 
-    if (user.username_setup_done === false) {
+    if (needsUsernameOnboarding(user)) {
         return <Navigate to="/setup/username" replace />;
     }
 

@@ -1,5 +1,6 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { needsUsernameOnboarding } from "../lib/usernameOnboarding";
 
 /** Only users with role coach (from /me). */
 const CoachRoute = ({ children }) => {
@@ -19,7 +20,7 @@ const CoachRoute = ({ children }) => {
         return <Navigate to="/dashboard" replace />;
     }
 
-    if (user?.username_setup_done === false) {
+    if (needsUsernameOnboarding(user)) {
         return <Navigate to="/setup/username" replace />;
     }
 

@@ -12,6 +12,7 @@ import Sub5Image from "../assets/sub5.png";
 import DashboardInsights from "./DashboardInsights";
 import { userAvatarUrl } from "../lib/userAvatar";
 import { getChadRank } from "../lib/chadRank";
+import { needsUsernameOnboarding } from "../lib/usernameOnboarding";
 
 const Dashboard = () => {
   const [templates, setTemplates] = useState([]);
@@ -27,7 +28,7 @@ const Dashboard = () => {
   const { units, setUnits, foodUnit, setFoodUnit } = useUnits();
 
   useEffect(() => {
-    if (!authLoading && user && user.username_setup_done === false) {
+    if (!authLoading && user && needsUsernameOnboarding(user)) {
       navigate("/setup/username", { replace: true });
       return;
     }

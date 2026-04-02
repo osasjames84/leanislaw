@@ -8,6 +8,7 @@ import {
     rnWebPasswordExtraProps,
 } from "../lib/rnWebView";
 import ChadPhoto from "../assets/creator_photo.png";
+import { needsUsernameOnboarding } from "../lib/usernameOnboarding";
 
 const Login = () => {
     const rnWeb = isReactNativeWebView();
@@ -36,7 +37,7 @@ const Login = () => {
 
     const navigateAfterLogin = useCallback(
         (u) => {
-            if (u?.username_setup_done === false) {
+            if (needsUsernameOnboarding(u)) {
                 navigate("/setup/username", { replace: true });
                 return;
             }

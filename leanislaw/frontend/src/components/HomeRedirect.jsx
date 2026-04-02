@@ -1,5 +1,6 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { needsUsernameOnboarding } from "../lib/usernameOnboarding";
 
 const HomeRedirect = () => {
     const { token, user, loading } = useAuth();
@@ -13,7 +14,7 @@ const HomeRedirect = () => {
     if (!token) {
         return <Navigate to="/login" replace />;
     }
-    if (user?.username_setup_done === false) {
+    if (needsUsernameOnboarding(user)) {
         return <Navigate to="/setup/username" replace />;
     }
     if (user?.role === "coach") {

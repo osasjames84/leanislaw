@@ -63,15 +63,33 @@ export default function ProfilePage() {
         setFriendsLoadError("");
         try {
             const res = await fetch("/api/v1/social/friends", { headers: authBearerHeaders(token) });
-            const data = await res.json().catch(() => null);
+            const raw = await res.text();
+            let data = null;
+            try {
+                data = raw ? JSON.parse(raw) : null;
+            } catch {
+                data = null;
+            }
             if (!res.ok) {
-                setFriendsLoadError(data?.error || "Could not load friends.");
+                const fallback =
+                    res.status === 401
+                        ? "Sign in again — your session may have expired."
+                        : res.status === 404
+                          ? "Friends API not found. Redeploy the API from the latest code (includes /api/v1/social)."
+                          : res.status === 503
+                            ? "Database may need migration 015 (user_friendships). On Railway: redeploy so startup migrations run, or run npm run migrate with DATABASE_URL."
+                            : res.status === 403
+                              ? "Verify your email, or sign in again."
+                              : `Could not load friends (${res.status}).`;
+                setFriendsLoadError(typeof data?.error === "string" && data.error ? data.error : fallback);
                 setFriends([]);
                 return;
             }
             setFriends(Array.isArray(data) ? data : []);
         } catch {
-            setFriendsLoadError("Could not load friends.");
+            setFriendsLoadError(
+                "Couldn’t reach the API (network or CORS). Add your Vercel URL to CORS_ORIGINS on Railway, e.g. https://your-app.vercel.app",
+            );
             setFriends([]);
         }
     }, [token]);
@@ -250,7 +268,11 @@ export default function ProfilePage() {
                         return;
                     }
                 }
-                setFriendError(data.error || "No one found with that UID or username.");
+                setFriendError(
+                    res.status === 404
+                        ? `No account with id ${id} on this server. UIDs are per database — use the number your friend sees on Profile in this same app (not localhost vs Vercel), or search their @username.`
+                        : data.error || "No one found with that UID or username.",
+                );
                 return;
             }
 
@@ -546,8 +568,8 @@ export default function ProfilePage() {
             <div style={card}>
                 <h2 style={sectionTitle}>Friends</h2>
                 <p style={hint}>
-                    Search by numeric <strong>UID</strong> or by <strong>@username</strong> (handles are 3–30 chars).
-                    All-digit input tries UID first, then a digit-only handle if needed.
+                    Search by <strong>UID</strong> or <strong>@username</strong>. UIDs only match users in{" "}
+                    <strong>this</strong> deployment (production Vercel ↔ Railway is one world; local dev is another).
                 </p>
                 {friendsLoadError ? <div style={errBox}>{friendsLoadError}</div> : null}
 
