@@ -47,7 +47,7 @@ const iconImg = {
 const tabs = [
     { to: "/leaderboard", label: "Leaderboard", emoji: "🏆" },
     { to: "/macros", label: "Macros", emoji: "🥗" },
-    { to: "/chat", label: "Chats", image: ChadPhoto },
+    { to: "/chat", label: "Chads", image: ChadPhoto },
     { to: "/workout", label: "Workout", emoji: "💪" },
 ];
 

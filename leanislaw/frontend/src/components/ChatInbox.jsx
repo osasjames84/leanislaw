@@ -3,7 +3,32 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { authBearerHeaders } from "../apiHeaders";
 import ChadPhoto from "../assets/creator_photo.png";
-import { formatSentAgo, displayNameFriend } from "../lib/formatChatTime";
+import { formatShortTime, displayNameFriend } from "../lib/formatChatTime";
+
+/** Filled bubble (new / you sent) vs outline (last from them) — iOS blue + gray stroke. */
+function ChatBubbleIcon({ variant }) {
+    if (variant === "outline") {
+        return (
+            <svg width={16} height={16} viewBox="0 0 24 24" aria-hidden style={{ flexShrink: 0 }}>
+                <path
+                    fill="none"
+                    stroke="#8e8e93"
+                    strokeWidth="2"
+                    strokeLinejoin="round"
+                    d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8.5z"
+                />
+            </svg>
+        );
+    }
+    return (
+        <svg width={16} height={16} viewBox="0 0 24 24" aria-hidden style={{ flexShrink: 0 }}>
+            <path
+                fill="#007aff"
+                d="M20 2H4a2 2 0 00-2 2v18l4-4h14a2 2 0 002-2V4a2 2 0 00-2-2zm-3 9H7V9h10v2zm0-3H7V6h10v2z"
+            />
+        </svg>
+    );
+}
 
 export default function ChatInbox() {
     const navigate = useNavigate();
@@ -89,69 +114,114 @@ export default function ChatInbox() {
         chadPreview?.last_at &&
         Date.now() - new Date(chadPreview.last_at).getTime() < 5 * 60 * 1000;
 
-    const chadSubtitle = useMemo(() => {
+    const chadStatus = useMemo(() => {
         if (!chadPreview?.preview) {
-            return "Message Chad Bot — training, diet, games";
+            return {
+                bubble: "accent",
+                text: "New chat · Training, diet, and games",
+                time: "",
+            };
         }
-        const you = chadPreview.last_from_me ? "You: " : "";
-        const time = formatSentAgo(chadPreview.last_at);
-        return `${you}${chadPreview.preview}${time ? ` · ${time}` : ""}`;
+        const short = formatShortTime(chadPreview.last_at);
+        const snippet =
+            chadPreview.preview.length > 42 ? `${chadPreview.preview.slice(0, 40)}…` : chadPreview.preview;
+        if (chadPreview.last_from_me) {
+            return {
+                bubble: "filled",
+                text: `You: ${snippet}`,
+                time: short,
+            };
+        }
+        return {
+            bubble: "outline",
+            text: snippet,
+            time: short,
+        };
     }, [chadPreview]);
 
-    const friendSubtitle = (f) => {
+    const friendStatus = (f) => {
         const s = summaryByPeer.get(f.id);
-        if (!s?.preview) return "Tap to message";
-        const prefix = s.from_me ? "You: " : "";
-        const time = formatSentAgo(s.last_at);
-        return `${prefix}${s.preview}${time ? ` · ${time}` : ""}`;
-    };
-
-    const goChad = (_e, opts = {}) => {
-        navigate("/chat/chad", { state: opts.openAttach ? { openAttach: true } : undefined });
-    };
-
-    const goFriend = (f, openAttach) => {
-        navigate(`/chat/friend/${f.id}`, { state: openAttach ? { openAttach: true } : undefined });
+        if (!s?.preview) {
+            return {
+                bubble: "accent",
+                text: "New chat · Say hey",
+                time: "",
+            };
+        }
+        const short = formatShortTime(s.last_at);
+        const snippet = s.preview.length > 44 ? `${s.preview.slice(0, 42)}…` : s.preview;
+        if (s.from_me) {
+            return {
+                bubble: "filled",
+                text: `You: ${snippet}`,
+                time: short,
+            };
+        }
+        return {
+            bubble: "outline",
+            text: snippet,
+            time: short,
+        };
     };
 
     return (
         <div style={page}>
-            <header style={header}>
-                <h1 style={title}>Chats</h1>
+            <header style={topBar}>
+                <button type="button" style={backBtn} onClick={() => navigate("/dashboard")}>
+                    ← Back
+                </button>
+                <h1 style={pageTitle}>Chads</h1>
+                <span style={headerSpacer} aria-hidden />
             </header>
 
-            {loadError ? <div style={errBanner}>{loadError}</div> : null}
+            {loadError ? (
+                <div style={errorWrap}>
+                    <div style={errBox}>{loadError}</div>
+                </div>
+            ) : null}
 
-            <div style={listWrap}>
+            <div style={listCard}>
                 {loading ? <p style={muted}>Loading…</p> : null}
 
-                <div style={rowOuter}>
-                    <button type="button" style={rowMain} onClick={() => goChad()} aria-label="Open Chad Bot">
-                        <div style={avatarWrap}>
-                            <img src={ChadPhoto} alt="" style={avatar} />
-                            {chadActive ? <span style={onlineDot} aria-hidden /> : null}
+                <button
+                    type="button"
+                    style={{
+                        ...rowBtn,
+                        ...(sortedFriends.length === 0 ? rowBtnLast : {}),
+                    }}
+                    onClick={() => navigate("/chat/chad")}
+                    aria-label="Open Chad Bot"
+                >
+                    <div style={avatarWrap}>
+                        <img src={ChadPhoto} alt="" style={avatar} />
+                        {chadActive ? <span style={onlineDot} aria-hidden /> : null}
+                    </div>
+                    <div style={textCol}>
+                        <div style={nameLine}>Chad Bot</div>
+                        <div style={statusRow}>
+                            <ChatBubbleIcon variant={chadStatus.bubble} />
+                            <span style={statusText}>{chadStatus.text}</span>
+                            {chadStatus.time ? (
+                                <>
+                                    <span style={statusSep}>·</span>
+                                    <span style={statusTime}>{chadStatus.time}</span>
+                                </>
+                            ) : null}
                         </div>
-                        <div style={textCol}>
-                            <div style={nameLine}>Chad Bot</div>
-                            <div style={subLine}>{chadSubtitle}</div>
-                        </div>
-                    </button>
-                    <button
-                        type="button"
-                        style={camBtn}
-                        aria-label="Open Chad Bot composer"
-                        onClick={() => goChad(null, { openAttach: true })}
-                    >
-                        <CameraIcon />
-                    </button>
-                </div>
+                    </div>
+                </button>
 
-                {sortedFriends.map((f) => (
-                    <div key={f.id} style={rowOuter}>
+                {sortedFriends.map((f, idx) => {
+                    const st = friendStatus(f);
+                    return (
                         <button
+                            key={f.id}
                             type="button"
-                            style={rowMain}
-                            onClick={() => goFriend(f, false)}
+                            style={{
+                                ...rowBtn,
+                                ...(idx === sortedFriends.length - 1 ? rowBtnLast : {}),
+                            }}
+                            onClick={() => navigate(`/chat/friend/${f.id}`)}
                             aria-label={`Open chat with ${displayNameFriend(f)}`}
                         >
                             <div style={avatarWrap}>
@@ -159,19 +229,20 @@ export default function ChatInbox() {
                             </div>
                             <div style={textCol}>
                                 <div style={nameLine}>{displayNameFriend(f)}</div>
-                                <div style={subLine}>{friendSubtitle(f)}</div>
+                                <div style={statusRow}>
+                                    <ChatBubbleIcon variant={st.bubble} />
+                                    <span style={statusText}>{st.text}</span>
+                                    {st.time ? (
+                                        <>
+                                            <span style={statusSep}>·</span>
+                                            <span style={statusTime}>{st.time}</span>
+                                        </>
+                                    ) : null}
+                                </div>
                             </div>
                         </button>
-                        <button
-                            type="button"
-                            style={camBtn}
-                            aria-label="Open chat composer"
-                            onClick={() => goFriend(f, true)}
-                        >
-                            <CameraIcon />
-                        </button>
-                    </div>
-                ))}
+                    );
+                })}
 
                 {!loading && friends.length === 0 ? (
                     <p style={emptyHint}>Add friends from Profile to message them here.</p>
@@ -181,80 +252,101 @@ export default function ChatInbox() {
     );
 }
 
-function CameraIcon() {
-    return (
-        <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.5">
-            <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.37-.586.88-.586 1.407V16.2c0 1.108.806 2.057 1.907 2.185a48.208 48.208 0 007.186 0 2.1 2.1 0 001.907-2.185v-8.226c0-.621-.294-1.208-.806-1.59l-1.42-1.066a1.13 1.13 0 00-1.591.327l-1.184 2.073a1.13 1.13 0 01-1.591.327L6.827 6.175z"
-            />
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
-    );
-}
-
 const page = {
     minHeight: "100vh",
-    background: "#000",
-    color: "#f5f5f5",
-    paddingBottom: "calc(56px + env(safe-area-inset-bottom, 0px))",
-    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif',
+    background: "#f2f2f7",
+    paddingBottom: "calc(48px + 62px + env(safe-area-inset-bottom, 0px))",
+    fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif",
 };
 
-const header = {
-    padding: "calc(14px + env(safe-area-inset-top, 0px)) 16px 12px",
-    borderBottom: "0.5px solid #262626",
-    background: "#000",
+const topBar = {
     position: "sticky",
     top: 0,
-    zIndex: 10,
+    zIndex: 99,
+    flexShrink: 0,
+    /* Extra space under notch / Dynamic Island; min when env() is 0 in some WebViews */
+    paddingTop: "max(44px, calc(env(safe-area-inset-top, 0px) + 18px))",
+    paddingBottom: "12px",
+    paddingLeft: "max(12px, env(safe-area-inset-left, 0px))",
+    paddingRight: "max(12px, env(safe-area-inset-right, 0px))",
+    background: "#fff",
+    borderBottom: "0.5px solid #d1d1d6",
+    display: "grid",
+    gridTemplateColumns: "minmax(72px, 1fr) auto minmax(72px, 1fr)",
+    alignItems: "center",
+    boxSizing: "border-box",
 };
 
-const title = { margin: 0, fontSize: "1.35rem", fontWeight: 800 };
+const backBtn = {
+    border: "none",
+    background: "none",
+    color: "#007aff",
+    fontWeight: 600,
+    fontSize: "1rem",
+    cursor: "pointer",
+    padding: "4px 0",
+    justifySelf: "start",
+    gridColumn: 1,
+};
 
-const errBanner = {
-    margin: "12px 16px 0",
+const pageTitle = {
+    margin: 0,
+    fontSize: "1.1rem",
+    fontWeight: 800,
+    color: "#000",
+    gridColumn: 2,
+    justifySelf: "center",
+    textAlign: "center",
+};
+
+const headerSpacer = { gridColumn: 3, justifySelf: "end" };
+
+const errorWrap = { margin: "0 0 12px", padding: "0 16px", boxSizing: "border-box" };
+
+const errBox = {
+    background: "#ffecec",
+    color: "#c00",
     padding: "10px 12px",
     borderRadius: 10,
-    background: "#2a1515",
-    color: "#ffb4b4",
-    fontSize: "0.88rem",
+    fontSize: 14,
 };
 
-const listWrap = { padding: "4px 0 24px" };
+const listCard = {
+    background: "#fff",
+    margin: 0,
+    padding: 0,
+    borderRadius: 0,
+    boxShadow: "none",
+    boxSizing: "border-box",
+};
 
-const muted = { color: "#a8a8a8", padding: "16px", margin: 0, fontSize: "0.95rem" };
+const muted = { color: "#8e8e93", padding: "16px 16px", margin: 0, fontSize: "0.95rem" };
 
 const emptyHint = {
-    color: "#737373",
-    padding: "20px 20px 8px",
+    color: "#8e8e93",
+    padding: "12px 16px 16px",
     margin: 0,
     fontSize: "0.9rem",
     lineHeight: 1.45,
 };
 
-const rowOuter = {
-    display: "flex",
-    alignItems: "center",
-    width: "100%",
-    paddingRight: 4,
-    boxSizing: "border-box",
-};
-
-const rowMain = {
+const rowBtn = {
     display: "flex",
     alignItems: "center",
     gap: 12,
-    flex: 1,
-    minWidth: 0,
-    padding: "12px 8px 12px 16px",
+    width: "100%",
+    padding: "12px 16px",
     border: "none",
+    borderBottom: "0.5px solid #e5e5ea",
     background: "transparent",
     cursor: "pointer",
     textAlign: "left",
     color: "inherit",
     boxSizing: "border-box",
+};
+
+const rowBtnLast = {
+    borderBottom: "none",
 };
 
 const avatarWrap = {
@@ -269,7 +361,8 @@ const avatar = {
     height: 56,
     borderRadius: "50%",
     objectFit: "cover",
-    background: "#262626",
+    background: "#f2f2f7",
+    border: "1px solid #d1d1d6",
     display: "block",
 };
 
@@ -280,8 +373,8 @@ const onlineDot = {
     width: 14,
     height: 14,
     borderRadius: "50%",
-    background: "#3acf5c",
-    border: "2px solid #000",
+    background: "#34c759",
+    border: "2px solid #fff",
     boxSizing: "border-box",
 };
 
@@ -289,30 +382,38 @@ const textCol = { flex: 1, minWidth: 0 };
 
 const nameLine = {
     fontSize: "1rem",
-    fontWeight: 600,
+    fontWeight: 700,
+    color: "#000",
     marginBottom: 4,
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
 };
 
-const subLine = {
+const statusRow = {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    minWidth: 0,
     fontSize: "0.88rem",
-    color: "#a8a8a8",
+    lineHeight: 1.25,
+};
+
+const statusText = {
+    color: "#3a3a3c",
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
+    minWidth: 0,
+    flex: 1,
 };
 
-const camBtn = {
+const statusSep = {
+    color: "#c7c7cc",
     flexShrink: 0,
-    border: "none",
-    background: "transparent",
-    color: "#a8a8a8",
-    padding: 8,
-    cursor: "pointer",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 10,
+};
+
+const statusTime = {
+    color: "#8e8e93",
+    flexShrink: 0,
 };

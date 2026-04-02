@@ -608,7 +608,7 @@ const CoachChat = () => {
 
             <header style={header}>
                 <button type="button" style={backBtn} onClick={() => navigate("/chat")}>
-                    ← Chats
+                    ← Chads
                 </button>
                 <h1 style={title}>Chad Bot</h1>
                 <span style={headerSpacer} aria-hidden />
@@ -807,7 +807,10 @@ const header = {
     display: "grid",
     gridTemplateColumns: "1fr auto 1fr",
     alignItems: "center",
-    padding: "calc(10px + env(safe-area-inset-top, 0px)) 12px 10px",
+    paddingTop: "max(40px, calc(env(safe-area-inset-top, 0px) + 14px))",
+    paddingBottom: "10px",
+    paddingLeft: "max(12px, env(safe-area-inset-left, 0px))",
+    paddingRight: "max(12px, env(safe-area-inset-right, 0px))",
     borderBottom: "0.5px solid #d1d1d6",
     background: "#fff",
 };
@@ -825,7 +828,7 @@ const headerSpacer = { gridColumn: 3, width: 48 };
 const chatWrap = {
     flex: 1,
     overflowY: "auto",
-    padding: "14px 12px 12px",
+    padding: "14px 0 12px",
     display: "flex",
     flexDirection: "column",
     gap: 8,
@@ -882,7 +885,7 @@ const composerOuter = {
     flexShrink: 0,
     position: "relative",
     zIndex: 50,
-    padding: "0 12px calc(74px + env(safe-area-inset-bottom, 0px))",
+    padding: "0 0 calc(74px + env(safe-area-inset-bottom, 0px))",
     borderTop: "0.5px solid #d1d1d6",
     background: "rgba(255,255,255,0.94)",
 };
