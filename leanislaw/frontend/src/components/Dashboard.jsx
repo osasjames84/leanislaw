@@ -191,17 +191,6 @@ const Dashboard = () => {
                     Ounces
                   </button>
                 </div>
-                {user?.id != null ? (
-                  <>
-                    <p style={settingsAccountIdLabelStyle}>Account id</p>
-                    <p style={settingsAccountIdHintStyle}>
-                      Use this number for{" "}
-                      <code style={settingsCodeStyle}>SEED_USER_ID</code> when running the demo
-                      analytics seed from your computer.
-                    </p>
-                    <p style={settingsAccountIdValueStyle}>{user.id}</p>
-                  </>
-                ) : null}
                 <button type="button" style={settingsLogoutItemStyle} onClick={handleLogout}>
                   Log out
                 </button>
@@ -428,38 +417,6 @@ const settingsSegmentActiveStyle = {
   backgroundColor: '#fff',
   color: '#000',
   boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-};
-const settingsAccountIdLabelStyle = {
-  margin: 0,
-  padding: '12px 16px 4px',
-  fontSize: '0.7rem',
-  fontWeight: '800',
-  color: '#8e8e93',
-  letterSpacing: '1px',
-  textTransform: 'uppercase',
-};
-const settingsAccountIdHintStyle = {
-  margin: 0,
-  padding: '0 16px 8px',
-  fontSize: '0.75rem',
-  color: '#636366',
-  lineHeight: 1.35,
-};
-const settingsAccountIdValueStyle = {
-  margin: 0,
-  padding: '0 16px 14px',
-  fontSize: '1.15rem',
-  fontWeight: '700',
-  fontVariantNumeric: 'tabular-nums',
-  color: '#000',
-  letterSpacing: '0.02em',
-};
-const settingsCodeStyle = {
-  fontSize: '0.72rem',
-  backgroundColor: '#f2f2f7',
-  padding: '2px 5px',
-  borderRadius: 4,
-  fontWeight: 600,
 };
 const settingsLogoutItemStyle = {
   width: '100%',
