@@ -12,6 +12,10 @@ export const users = pgTable('users', {
   first_name: varchar('first_name').notNull(),
   last_name: varchar('last_name').notNull(),
   email: text('email').notNull().unique(),       // unique login email
+  /** Optional @handle-style id; lowercase a-z0-9._ , unique when set. */
+  username: varchar('username', { length: 30 }).unique(),
+  /** false until user picks a unique username (/setup/username) after register. */
+  username_setup_done: boolean('username_setup_done').notNull().default(true),
   date_of_birth: date('date_of_birth').notNull(),
   password_hash: text('password_hash').notNull(),          // hashed password
   role: userRole('role').notNull(),
@@ -31,6 +35,9 @@ export const users = pgTable('users', {
   password_reset_expires_at: timestamp('password_reset_expires_at'),
   password_reset_sent_at: timestamp('password_reset_sent_at'),
   failed_login_count: integer('failed_login_count').notNull().default(0),
+
+  /** https URL or site path. Null = default /sub5.png (public asset). */
+  profile_image_url: text('profile_image_url'),
 
 });
 

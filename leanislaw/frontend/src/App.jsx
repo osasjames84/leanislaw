@@ -14,6 +14,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import HomeRedirect from "./components/HomeRedirect";
 import TdeeCalculator from "./components/TdeeCalculator";
 import TdeeOnboarding from "./components/TdeeOnboarding";
+import UsernameOnboarding from "./components/UsernameOnboarding";
 import AppShell from "./components/AppShell";
 import LogCalories from "./components/LogCalories";
 import LogWeight from "./components/LogWeight";
@@ -86,6 +87,14 @@ const App = () => {
               element={
                 <ProtectedRoute>
                   <StartWorkout />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/setup/username"
+              element={
+                <ProtectedRoute>
+                  <UsernameOnboarding />
                 </ProtectedRoute>
               }
             />

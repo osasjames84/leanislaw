@@ -21,15 +21,27 @@ export async function requireAuth(req, res, next) {
 
     const userId = Number(payload.sub);
     try {
-        const rows = await db
-            .select({ email_verified: users.email_verified })
-            .from(users)
-            .where(eq(users.id, userId))
-            .limit(1);
-        if (rows.length === 0) {
-            return res.status(401).json({ error: 'Unauthorized' });
+        // Some Railway databases lag behind the current app schema (e.g. missing `email_verified`).
+        // To keep the app usable, fall back to "allow" when the column doesn't exist.
+        let rows;
+        try {
+            rows = await db
+                .select({ email_verified: users.email_verified })
+                .from(users)
+                .where(eq(users.id, userId))
+                .limit(1);
+        } catch (e) {
+            rows = await db
+                .select({ id: users.id })
+                .from(users)
+                .where(eq(users.id, userId))
+                .limit(1);
         }
-        if (!rows[0].email_verified) {
+
+        if (rows.length === 0) return res.status(401).json({ error: 'Unauthorized' });
+
+        const emailVerified = rows[0].email_verified;
+        if (typeof emailVerified === "boolean" && !emailVerified) {
             return res.status(403).json({
                 error: 'Verify your email before using the app.',
                 code: 'EMAIL_NOT_VERIFIED',

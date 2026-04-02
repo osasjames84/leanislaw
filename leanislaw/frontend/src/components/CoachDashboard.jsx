@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { authBearerHeaders } from "../apiHeaders";
+import { userAvatarUrl } from "../lib/userAvatar";
 
 const CoachDashboard = () => {
     const navigate = useNavigate();
@@ -45,10 +46,27 @@ const CoachDashboard = () => {
                 >
                     ← App home
                 </button>
-                <h1 style={{ margin: "12px 0 4px", fontSize: "1.5rem", fontWeight: 800 }}>Coach</h1>
-                <p style={{ margin: 0, color: "#8e8e93", fontSize: "0.9rem" }}>
-                    {user?.first_name} {user?.last_name}
-                </p>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12 }}>
+                    {user ? (
+                        <img
+                            src={userAvatarUrl(user)}
+                            alt=""
+                            width={44}
+                            height={44}
+                            style={{
+                                borderRadius: 12,
+                                border: "1px solid #d1d1d6",
+                                objectFit: "cover",
+                            }}
+                        />
+                    ) : null}
+                    <div>
+                        <h1 style={{ margin: "0 0 4px", fontSize: "1.5rem", fontWeight: 800 }}>Coach</h1>
+                        <p style={{ margin: 0, color: "#8e8e93", fontSize: "0.9rem" }}>
+                            {user?.first_name} {user?.last_name}
+                        </p>
+                    </div>
+                </div>
             </header>
 
             <div

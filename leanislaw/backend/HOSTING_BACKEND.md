@@ -9,7 +9,7 @@
 - Build command: `npm install`
 - Start command: `npm run start`
 
-After the first deploy, apply SQL in `backend/migrations/` (in order) on the same Postgres instance as `DATABASE_URL`, or from your machine: `npm run migrate` with `DATABASE_URL` set to production. Skipping this causes errors like “column premium_coaching_active does not exist” on register/login.
+On each start, the server runs SQL in `backend/migrations/` (sorted, idempotent) before listening — so the DB stays aligned with the code after you redeploy. To skip that (advanced), set `SKIP_SQL_MIGRATIONS=1`. You can still run `npm run migrate` locally with `DATABASE_URL` pointing at any Postgres.
 
 ## 3) Set environment variables
 - `DATABASE_URL`

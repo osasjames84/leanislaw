@@ -36,6 +36,15 @@ const getChadRank = (workoutCount) => {
     return "SUB-5";
 };
 
+/** Avoid resurrecting the PiP widget: a slow initial session GET can resolve after finish and strip endTime. */
+function mergeSessionPreserveCompletion(prev, incoming) {
+    if (!incoming || incoming.error) return prev;
+    const pEnd = prev?.endTime ?? prev?.end_time;
+    const iEnd = incoming.endTime ?? incoming.end_time;
+    if (pEnd && !iEnd) return { ...incoming, endTime: pEnd };
+    return incoming;
+}
+
 const WorkoutSession = ({ sessionId: sessionIdProp, sheetMode = false }) => {
     const { id: routeId } = useParams();
     const id = sessionIdProp ?? routeId;
@@ -56,9 +65,17 @@ const WorkoutSession = ({ sessionId: sessionIdProp, sheetMode = false }) => {
     // 1. New Modal UI State
     const [showPicker, setShowPicker] = useState(false);
     const [showFinishModal, setShowFinishModal] = useState(false);
+    const [finishSaving, setFinishSaving] = useState(false);
+    const [finishError, setFinishError] = useState(null);
     const addMovementsInFlightRef = useRef(false);
+    /** After cancel, clearActiveWorkout() would otherwise let this effect immediately call setActiveWorkout again on the same in-flight screen. */
+    const skipRegisterActiveRef = useRef(false);
 
     const unfinishedSetCount = countUnfinishedSets(sessionExercises);
+
+    useEffect(() => {
+        skipRegisterActiveRef.current = false;
+    }, [id]);
 
     useEffect(() => {
         if (!token || id == null || id === "") return;
@@ -72,7 +89,7 @@ const WorkoutSession = ({ sessionId: sessionIdProp, sheetMode = false }) => {
                     console.error("Session Fetch Error:", data.error);
                     return;
                 }
-                setSession(data);
+                setSession((prev) => mergeSessionPreserveCompletion(prev, data));
                 setIsTemplate(data.is_template || false);
             })
             .catch((err) => console.error("Session Fetch Error:", err));
@@ -102,14 +119,29 @@ const WorkoutSession = ({ sessionId: sessionIdProp, sheetMode = false }) => {
     useEffect(() => {
         if (!session) return;
         const sid = Number(id);
+        const ctxSid = activeWorkout != null ? Number(activeWorkout.sessionId) : NaN;
+        const ctxMatches = Number.isFinite(ctxSid) && ctxSid === sid;
+        const endedAt = session.endTime ?? session.end_time;
+        if (endedAt) {
+            if (activeWorkout != null && ctxMatches) {
+                clearActiveWorkout();
+            }
+            if (session.date != null) {
+                const startMs = new Date(session.date).getTime();
+                if (Number.isFinite(startMs)) setSessionStartTime(startMs);
+            }
+            return;
+        }
+        if (showSummary) return;
+        if (skipRegisterActiveRef.current) return;
         const fromContext =
-            activeWorkout?.sessionId === sid && Number.isFinite(activeWorkout?.startTimeMs)
+            ctxMatches && Number.isFinite(activeWorkout?.startTimeMs)
                 ? activeWorkout.startTimeMs
                 : Date.now();
         setSessionStartTime(fromContext);
         const nextName = session.name || "Workout";
         const needsUpdate =
-            activeWorkout?.sessionId !== sid ||
+            !ctxMatches ||
             activeWorkout?.startTimeMs !== fromContext ||
             activeWorkout?.sessionName !== nextName;
         if (needsUpdate) {
@@ -119,7 +151,7 @@ const WorkoutSession = ({ sessionId: sessionIdProp, sheetMode = false }) => {
                 startTimeMs: fromContext,
             });
         }
-    }, [id, session, activeWorkout, setActiveWorkout]);
+    }, [id, session, activeWorkout, setActiveWorkout, clearActiveWorkout, showSummary]);
 
     useEffect(() => {
         setNow(Date.now());
@@ -140,8 +172,17 @@ const WorkoutSession = ({ sessionId: sessionIdProp, sheetMode = false }) => {
         });
     };
 
+    const elapsedClockMs = () => {
+        const endRaw = session?.endTime ?? session?.end_time;
+        if (endRaw) {
+            const t = new Date(endRaw).getTime();
+            if (Number.isFinite(t)) return t;
+        }
+        return now;
+    };
+
     const formatElapsed = () => {
-        const diffMs = Math.max(0, now - sessionStartTime);
+        const diffMs = Math.max(0, elapsedClockMs() - sessionStartTime);
         const totalSeconds = Math.floor(diffMs / 1000);
         const hours = Math.floor(totalSeconds / 3600);
         const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -153,7 +194,7 @@ const WorkoutSession = ({ sessionId: sessionIdProp, sheetMode = false }) => {
 
     /** Compact timer for the sticky bar (e.g. 2:54 or 1:02:03). */
     const formatElapsedShort = () => {
-        const diffMs = Math.max(0, now - sessionStartTime);
+        const diffMs = Math.max(0, elapsedClockMs() - sessionStartTime);
         const totalSeconds = Math.floor(diffMs / 1000);
         const hours = Math.floor(totalSeconds / 3600);
         const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -260,46 +301,85 @@ const WorkoutSession = ({ sessionId: sessionIdProp, sheetMode = false }) => {
     }, []);
 
     const handleFinishWorkout = async () => {
+        setFinishError(null);
+        setFinishSaving(true);
         try {
-            const savePromises = sessionExercises.map((exerciseLog) =>
-                fetch(`/api/v1/exerciseLog/${exerciseLog.id}`, {
-                    method: "PUT",
-                    headers: authJsonHeaders(token),
-                    body: JSON.stringify({
-                        sets: Array.isArray(exerciseLog.sets) ? exerciseLog.sets : [],
-                    }),
+            const sid = Number(id);
+            if (!Number.isFinite(sid)) {
+                throw new Error("Invalid workout session");
+            }
+
+            const logsToSave = sessionExercises.filter((row) => row?.id != null);
+            await Promise.all(
+                logsToSave.map(async (exerciseLog) => {
+                    const res = await fetch(`/api/v1/exerciseLog/${exerciseLog.id}`, {
+                        method: "PUT",
+                        headers: authJsonHeaders(token),
+                        body: JSON.stringify({
+                            sets: Array.isArray(exerciseLog.sets) ? exerciseLog.sets : [],
+                        }),
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok) {
+                        throw new Error(data?.error || `Could not save exercise log (${exerciseLog.id})`);
+                    }
                 })
             );
-            await Promise.all(savePromises);
 
-            const logRes = await fetch(`/api/v1/exerciseLog?workout_sessions_id=${id}`, {
+            const logRes = await fetch(`/api/v1/exerciseLog?workout_sessions_id=${sid}`, {
                 headers: authBearerHeaders(token),
             });
-            const latestLogs = await logRes.json();
-
+            const latestLogs = await logRes.json().catch(() => null);
+            if (!logRes.ok) {
+                const msg =
+                    latestLogs && typeof latestLogs === "object" && latestLogs.error
+                        ? latestLogs.error
+                        : "Could not reload exercise logs";
+                throw new Error(msg);
+            }
             setSessionExercises(Array.isArray(latestLogs) ? latestLogs : []);
 
-            await fetch(`/api/v1/workoutSessions/${id}`, {
+            const endIso = new Date().toISOString();
+            const putRes = await fetch(`/api/v1/workoutSessions/${sid}`, {
                 method: "PUT",
                 headers: authJsonHeaders(token),
                 body: JSON.stringify({
                     is_template: isTemplate,
-                    end_time: new Date().toISOString(),
+                    end_time: endIso,
                 }),
             });
-
+            const putBody = await putRes.json().catch(() => null);
+            const putErr =
+                putBody && typeof putBody === "object" && !Array.isArray(putBody) && putBody.error
+                    ? String(putBody.error)
+                    : null;
+            if (!putRes.ok || !putBody || Array.isArray(putBody) || putErr) {
+                throw new Error(putErr || "Could not save workout (session update failed)");
+            }
+            setSession((prev) =>
+                mergeSessionPreserveCompletion(prev, {
+                    ...putBody,
+                    endTime: endIso,
+                })
+            );
+            skipRegisterActiveRef.current = false;
             clearActiveWorkout();
+            setShowFinishModal(false);
             setShowSummary(true);
         } catch (err) {
             console.error("Finish Error:", err);
-            setShowSummary(true);
+            setFinishError(err?.message || "Could not save workout");
+        } finally {
+            setFinishSaving(false);
         }
     };
 
-    const openFinishModal = () => setShowFinishModal(true);
+    const openFinishModal = () => {
+        setFinishError(null);
+        setShowFinishModal(true);
+    };
 
     const confirmFinishFromModal = async () => {
-        setShowFinishModal(false);
         await handleFinishWorkout();
     };
 
@@ -411,6 +491,7 @@ const WorkoutSession = ({ sessionId: sessionIdProp, sheetMode = false }) => {
                     <button
                         type="button"
                         onClick={() => {
+                            skipRegisterActiveRef.current = true;
                             clearActiveWorkout();
                             navigate(sheetMode ? "/workout" : -1);
                         }}
@@ -451,20 +532,36 @@ const WorkoutSession = ({ sessionId: sessionIdProp, sheetMode = false }) => {
                                 Save this session and view your summary.
                             </p>
                         )}
+                        {finishError ? (
+                            <p style={{ ...finishModalBodyStyle, color: "#c00", fontWeight: 600 }} role="alert">
+                                {finishError}
+                            </p>
+                        ) : null}
                         <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                             {unfinishedSetCount > 0 ? (
                                 <>
                                     <button
                                         type="button"
                                         style={finishPromptCompleteSetsStyle}
+                                        disabled={finishSaving}
                                         onClick={() => setShowFinishModal(false)}
                                     >
                                         Complete unfinished sets
                                     </button>
                                     <button
                                         type="button"
+                                        style={finishPromptCompleteSetsStyle}
+                                        disabled={finishSaving}
+                                        onClick={confirmFinishFromModal}
+                                    >
+                                        {finishSaving ? "Saving…" : "Finish & save anyway"}
+                                    </button>
+                                    <button
+                                        type="button"
                                         style={finishPromptDangerFillStyle}
+                                        disabled={finishSaving}
                                         onClick={() => {
+                                            skipRegisterActiveRef.current = true;
                                             clearActiveWorkout();
                                             navigate(sheetMode ? "/workout" : -1);
                                         }}
@@ -474,19 +571,26 @@ const WorkoutSession = ({ sessionId: sessionIdProp, sheetMode = false }) => {
                                     <button
                                         type="button"
                                         style={finishPromptCancelGreyStyle}
+                                        disabled={finishSaving}
                                         onClick={() => setShowFinishModal(false)}
                                     >
-                                        Cancel
+                                        Close
                                     </button>
                                 </>
                             ) : (
                                 <>
-                                    <button type="button" style={finishPromptCompleteSetsStyle} onClick={confirmFinishFromModal}>
-                                        Finish &amp; save
+                                    <button
+                                        type="button"
+                                        style={finishPromptCompleteSetsStyle}
+                                        disabled={finishSaving}
+                                        onClick={confirmFinishFromModal}
+                                    >
+                                        {finishSaving ? "Saving…" : "Finish & save"}
                                     </button>
                                     <button
                                         type="button"
                                         style={finishPromptCancelGreyStyle}
+                                        disabled={finishSaving}
                                         onClick={() => setShowFinishModal(false)}
                                     >
                                         Cancel

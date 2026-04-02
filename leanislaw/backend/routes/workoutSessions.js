@@ -11,6 +11,18 @@ function uid(req) {
     return Number.isFinite(id) ? id : null;
 }
 
+/** Drizzle `timestamp` columns call `.toISOString()` on values; JSON bodies use strings — coerce to Date. */
+function toPgTimestamp(value, { required = false } = {}) {
+    if (value === undefined || value === null) {
+        return required ? null : undefined;
+    }
+    if (value instanceof Date) {
+        return Number.isNaN(value.getTime()) ? null : value;
+    }
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d;
+}
+
 async function getSessionForUser(sessionId, userId) {
     if (!Number.isFinite(sessionId) || !Number.isFinite(userId)) return null;
     const rows = await db
@@ -96,13 +108,14 @@ router.post('/', requireAuth, async (req, res) => {
         if (!name || !Number.isFinite(user_id)) {
             return res.status(400).json({ message: "Missing workout name" });
         }
+         const sessionDate = toPgTimestamp(date) ?? new Date();
          const [newWorkoutSession] = await db.insert(workoutSessions)
          .values({
             name,
             is_template: is_template || false,
             user_id,
             notes: notes || "",
-            date: date || new Date(),    
+            date: sessionDate,
             }).returning();
 
             if(!newWorkoutSession){
@@ -284,7 +297,13 @@ router.put('/:id', requireAuth, async (req, res) => {
 
         const setPayload = {};
         if (is_template !== undefined) setPayload.is_template = is_template;
-        if (end_time !== undefined) setPayload.endTime = end_time;
+        if (end_time !== undefined) {
+            const endAt = toPgTimestamp(end_time, { required: true });
+            if (endAt == null) {
+                return res.status(400).json({ error: 'Invalid end_time' });
+            }
+            setPayload.endTime = endAt;
+        }
 
         if (Object.keys(setPayload).length === 0) {
             return res.json(owned);

@@ -336,6 +336,10 @@ const TdeeOnboarding = () => {
         );
     }
 
+    if (user.username_setup_done === false) {
+        return <Navigate to="/setup/username" replace />;
+    }
+
     if (user.tdee_onboarding_done && !ALLOW_REPEAT_TDEE && step !== "result") {
         return <Navigate to="/dashboard" replace />;
     }

@@ -1,5 +1,6 @@
 import express from 'express';
 import 'dotenv/config';
+import { applySqlMigrations } from './lib/applySqlMigrations.js';
 import exercisesRouter from './routes/exercises.js';
 import usersRouter from './routes/users.js';
 import workoutSessionsRouter from './routes/workoutSessions.js';
@@ -67,6 +68,26 @@ app.use('/api/v1/exercises', exercisesRouter);
 app.use('/api/v1/workoutSessions', workoutSessionsRouter);
 app.use('/api/v1/exerciseLog', exerciseLogRouter);
 
-app.listen(port, () => {
-    console.log(`Server running on port ${port}`);
-});
+function skipAutoMigrate() {
+    const v = process.env.SKIP_SQL_MIGRATIONS;
+    return v === '1' || /^true$/i.test(String(v || ''));
+}
+
+async function start() {
+    if (process.env.DATABASE_URL && !skipAutoMigrate()) {
+        try {
+            await applySqlMigrations({
+                verbose: process.env.MIGRATE_VERBOSE === '1',
+            });
+            console.log('[migrate] SQL migrations applied');
+        } catch (err) {
+            console.error('[migrate] failed:', err);
+            process.exit(1);
+        }
+    }
+    app.listen(port, () => {
+        console.log(`Server running on port ${port}`);
+    });
+}
+
+start();

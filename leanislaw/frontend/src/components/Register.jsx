@@ -1,9 +1,16 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import {
+    isReactNativeWebView,
+    mergePasswordFieldStyle,
+    passwordInputTypeForWebView,
+    rnWebPasswordExtraProps,
+} from "../lib/rnWebView";
 import { ageFromDateOfBirth, MIN_REGISTER_AGE, MAX_REGISTER_AGE } from "../utils/registerRules";
 
 const Register = () => {
+    const rnWeb = isReactNativeWebView();
     const navigate = useNavigate();
     const { register } = useAuth();
     const [form, setForm] = useState({
@@ -52,6 +59,10 @@ const Register = () => {
                     replace: true,
                     state: u.devVerificationCode ? { devVerificationCode: u.devVerificationCode } : undefined,
                 });
+                return;
+            }
+            if (u?.username_setup_done === false) {
+                navigate("/setup/username", { replace: true });
                 return;
             }
             const needsSetup = u && u.tdee_onboarding_done === false;
@@ -104,7 +115,7 @@ const Register = () => {
                         style={field}
                         value={form.email}
                         onChange={handleChange("email")}
-                        autoComplete="email"
+                        autoComplete={rnWeb ? "off" : "email"}
                         required
                     />
 
@@ -119,13 +130,17 @@ const Register = () => {
 
                     <label style={{ ...label, marginTop: 12 }}>Password</label>
                     <input
-                        type={showPassword ? "text" : "password"}
-                        style={field}
+                        type={passwordInputTypeForWebView(rnWeb, showPassword)}
+                        style={mergePasswordFieldStyle(field, rnWeb, showPassword)}
                         value={form.password}
                         onChange={handleChange("password")}
                         minLength={6}
-                        autoComplete="new-password"
+                        autoComplete={rnWeb ? "off" : "new-password"}
+                        autoCapitalize="off"
+                        autoCorrect="off"
+                        spellCheck={false}
                         required
+                        {...rnWebPasswordExtraProps(rnWeb)}
                     />
 
                     <label style={showRow}>

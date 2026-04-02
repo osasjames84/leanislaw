@@ -19,6 +19,10 @@ const CoachRoute = ({ children }) => {
         return <Navigate to="/dashboard" replace />;
     }
 
+    if (user?.username_setup_done === false) {
+        return <Navigate to="/setup/username" replace />;
+    }
+
     return children;
 };
 

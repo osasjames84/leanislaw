@@ -1,7 +1,14 @@
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import {
+    isReactNativeWebView,
+    mergePasswordFieldStyle,
+    passwordInputTypeForWebView,
+    rnWebPasswordExtraProps,
+} from "../lib/rnWebView";
 
 const ForgotPassword = () => {
+    const rnWeb = isReactNativeWebView();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const initialEmail = searchParams.get("email") || "";
@@ -34,7 +41,7 @@ const ForgotPassword = () => {
             if (data.devResetCode) {
                 setCode(String(data.devResetCode).replace(/\D/g, "").slice(0, 6));
                 setInfo(
-                    "Dev mode: use the code below (email was not sent — configure RESEND_API_KEY on the server to send real mail)."
+                    "Use the reset code shown below (outgoing email is not enabled yet)."
                 );
             } else {
                 setInfo(data.message || "If an account exists for that email, we sent a reset code.");
@@ -135,26 +142,34 @@ const ForgotPassword = () => {
                         </label>
                         <input
                             id="fp-pass"
-                            type="password"
-                            autoComplete="new-password"
-                            style={field}
+                            type={passwordInputTypeForWebView(rnWeb, false)}
+                            autoComplete={rnWeb ? "off" : "new-password"}
+                            autoCapitalize="off"
+                            autoCorrect="off"
+                            spellCheck={false}
+                            style={mergePasswordFieldStyle(field, rnWeb, false)}
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             minLength={6}
                             required
+                            {...rnWebPasswordExtraProps(rnWeb)}
                         />
                         <label style={{ ...label, marginTop: 12 }} htmlFor="fp-pass2">
                             Confirm password
                         </label>
                         <input
                             id="fp-pass2"
-                            type="password"
-                            autoComplete="new-password"
-                            style={field}
+                            type={passwordInputTypeForWebView(rnWeb, false)}
+                            autoComplete={rnWeb ? "off" : "new-password"}
+                            autoCapitalize="off"
+                            autoCorrect="off"
+                            spellCheck={false}
+                            style={mergePasswordFieldStyle(field, rnWeb, false)}
                             value={password2}
                             onChange={(e) => setPassword2(e.target.value)}
                             minLength={6}
                             required
+                            {...rnWebPasswordExtraProps(rnWeb)}
                         />
                         {error ? (
                             <p style={{ ...p, marginTop: 12, color: "#b45309" }} role="alert">

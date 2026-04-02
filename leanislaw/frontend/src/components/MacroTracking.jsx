@@ -1016,7 +1016,24 @@ const MacroTracking = () => {
                             </p>
                         </>
                     ) : !planLoading ? (
-                        <p style={targetsMuted}>Open Goals to set a plan — you need TDEE and a logged weight.</p>
+                        <>
+                            <p style={targetsMuted}>
+                                Open <strong>Goals</strong> (top right) to set calorie and macro targets — you need
+                                TDEE and a logged weight. You can still log meals below.
+                            </p>
+                            {totals.kcal > 0 ||
+                            totals.protein_g > 0 ||
+                            totals.carbs_g > 0 ||
+                            totals.fat_g > 0 ? (
+                                <div style={loggedTotalsNoPlan}>
+                                    <p style={loggedTotalsNoPlanTitle}>Logged today (no targets yet)</p>
+                                    {barRow("Energy", " kcal", totals.kcal, 0, "#000")}
+                                    {barRow("Protein", " g", totals.protein_g, 0, "#007aff")}
+                                    {barRow("Carbs", " g", totals.carbs_g, 0, "#34c759")}
+                                    {barRow("Fat", " g", totals.fat_g, 0, "#ff9500")}
+                                </div>
+                            ) : null}
+                        </>
                     ) : null}
                 </section>
 
@@ -1461,6 +1478,19 @@ const sectionLabel = {
     letterSpacing: "1px",
     textTransform: "uppercase",
     margin: "4px 0 8px 4px",
+};
+
+const loggedTotalsNoPlan = {
+    marginTop: 14,
+    paddingTop: 14,
+    borderTop: "1px solid #e5e5ea",
+};
+
+const loggedTotalsNoPlanTitle = {
+    margin: "0 0 10px",
+    fontSize: "0.78rem",
+    fontWeight: "700",
+    color: "#1c1c1e",
 };
 
 const mealCard = {

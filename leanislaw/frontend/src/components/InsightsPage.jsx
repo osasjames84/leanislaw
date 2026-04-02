@@ -10,36 +10,47 @@ const page = {
     minHeight: "100vh",
     boxSizing: "border-box",
     backgroundColor: "#f2f2f7",
-    padding:
-        "calc(12px + env(safe-area-inset-top, 0px)) 16px calc(28px + 62px + env(safe-area-inset-bottom, 0px))",
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    paddingBottom: "calc(28px + 62px + env(safe-area-inset-bottom, 0px))",
+    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif',
 };
 
-const header = {
+const navBar = {
+    position: "sticky",
+    top: 0,
+    zIndex: 20,
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 12,
-    marginBottom: 18,
+    gap: 8,
+    padding: "calc(14px + env(safe-area-inset-top, 0px)) 12px 12px",
+    backgroundColor: "#fff",
+    borderBottom: "0.5px solid #d1d1d6",
+};
+
+const content = {
+    padding: "16px 16px 0",
 };
 
 const backBtn = {
     border: "none",
     background: "none",
     color: "#007aff",
-    fontSize: "1rem",
+    fontSize: "0.95rem",
     fontWeight: "600",
     cursor: "pointer",
-    padding: "8px 0",
+    padding: "8px 4px",
+    flexShrink: 0,
 };
 
 const title = {
     margin: 0,
-    fontSize: "1.1rem",
+    fontSize: "1.05rem",
     fontWeight: "800",
+    letterSpacing: "-0.2px",
     color: "#000",
     textAlign: "center",
     flex: 1,
+    minWidth: 0,
 };
 
 const lead = {
@@ -168,7 +179,7 @@ const InsightsPage = () => {
 
     return (
         <div style={page}>
-            <header style={header}>
+            <header style={navBar}>
                 <button type="button" style={backBtn} onClick={() => navigate("/dashboard")}>
                     ← Dashboard
                 </button>
@@ -183,6 +194,7 @@ const InsightsPage = () => {
                 </button>
             </header>
 
+            <div style={content}>
             <p style={lead}>
                 Scroll charts sideways to see the full range ({rangeLabel || "…"}). Open a day to
                 edit calories, steps, or weight.
@@ -361,6 +373,7 @@ const InsightsPage = () => {
                     TDEE detail
                 </Link>
             </p>
+            </div>
         </div>
     );
 };

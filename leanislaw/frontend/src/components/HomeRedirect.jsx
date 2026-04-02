@@ -13,6 +13,9 @@ const HomeRedirect = () => {
     if (!token) {
         return <Navigate to="/login" replace />;
     }
+    if (user?.username_setup_done === false) {
+        return <Navigate to="/setup/username" replace />;
+    }
     if (user?.role === "coach") {
         return <Navigate to="/coach" replace />;
     }

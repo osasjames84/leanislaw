@@ -10,6 +10,7 @@ import { useUnits } from "../contexts/UnitsContext";
 import CreatorPhoto from "../assets/creator_photo.png"; 
 import Sub5Image from "../assets/sub5.png";
 import DashboardInsights from "./DashboardInsights";
+import { userAvatarUrl } from "../lib/userAvatar";
 
 // Simple rank helper based on total logged workouts
 const getChadRank = (workoutCount) => {
@@ -37,6 +38,10 @@ const Dashboard = () => {
   const { units, setUnits, foodUnit, setFoodUnit } = useUnits();
 
   useEffect(() => {
+    if (!authLoading && user && user.username_setup_done === false) {
+      navigate("/setup/username", { replace: true });
+      return;
+    }
     if (!authLoading && user && user.role !== "coach" && user.tdee_onboarding_done === false) {
       navigate("/setup/tdee", { replace: true });
     }
@@ -88,7 +93,17 @@ const Dashboard = () => {
     <div style={containerStyle}>
       {/* --- SLEEK HEADER WITH CREATOR PHOTO --- */}
       <header style={{ ...dashboardHeaderStyle, zIndex: settingsOpen ? 200 : 10 }}>
-        <div>
+        <div style={headerIdentityRow}>
+          {user ? (
+            <img
+              src={userAvatarUrl(user)}
+              alt=""
+              width={48}
+              height={48}
+              style={headerProfileImg}
+            />
+          ) : null}
+          <div style={{ flex: 1, minWidth: 0 }}>
           <h1 style={dashboardTitleStyle}>Lean is Law</h1>
           {user && (
             <p style={signedInStyle}>
@@ -110,6 +125,7 @@ const Dashboard = () => {
               />
             </div>
           )}
+          </div>
         </div>
 
         <div style={headerActionsStyle}>
@@ -307,6 +323,21 @@ const dashboardHeaderStyle = {
   display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
   padding: 'calc(20px + env(safe-area-inset-top, 0px)) 20px 20px', backgroundColor: '#fff', borderBottom: '0.5px solid #d1d1d6',
   position: 'sticky', top: 0, zIndex: 10
+};
+
+const headerIdentityRow = {
+  display: "flex",
+  alignItems: "flex-start",
+  gap: 12,
+  flex: 1,
+  minWidth: 0,
+};
+
+const headerProfileImg = {
+  borderRadius: 12,
+  border: "1px solid #d1d1d6",
+  objectFit: "cover",
+  flexShrink: 0,
 };
 
 const dashboardTitleStyle = { margin: 0, fontSize: '1.4rem', fontWeight: '900', color: '#000', letterSpacing: '-0.5px' };

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 const STORAGE_KEY = "leanislaw_active_workout";
 const ActiveWorkoutContext = createContext(null);
@@ -29,14 +29,21 @@ export function ActiveWorkoutProvider({ children }) {
         }
     }, [activeWorkout]);
 
-    const setActiveWorkout = (next) => {
+    const setActiveWorkout = useCallback((next) => {
         setActiveWorkoutState((prev) => ({
             ...(prev || {}),
             ...(next || {}),
         }));
-    };
+    }, []);
 
-    const clearActiveWorkout = () => setActiveWorkoutState(null);
+    const clearActiveWorkout = useCallback(() => {
+        try {
+            localStorage.removeItem(STORAGE_KEY);
+        } catch {
+            /* ignore */
+        }
+        setActiveWorkoutState(null);
+    }, []);
 
     const value = useMemo(
         () => ({
@@ -44,7 +51,7 @@ export function ActiveWorkoutProvider({ children }) {
             setActiveWorkout,
             clearActiveWorkout,
         }),
-        [activeWorkout]
+        [activeWorkout, setActiveWorkout, clearActiveWorkout]
     );
 
     return <ActiveWorkoutContext.Provider value={value}>{children}</ActiveWorkoutContext.Provider>;

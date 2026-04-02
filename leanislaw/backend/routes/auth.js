@@ -3,20 +3,52 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { db } from '../db.js';
 import { users } from '../schema.js';
-import { eq, sql, and } from 'drizzle-orm';
+import { eq, sql, and, ne } from 'drizzle-orm';
 import { JWT_SECRET, requireAuth } from '../middleware/auth.js';
 import { ageFromDateOfBirth, MIN_REGISTER_AGE, MAX_REGISTER_AGE } from '../lib/accountRules.js';
 import { generateSixDigitCode, hashEmailCode, normalizeSixDigitCode } from '../lib/emailCodes.js';
 import { sendRegistrationCodeEmail, sendPasswordResetCodeEmail } from '../lib/sendAuthEmails.js';
+import { resolveAvatarUrl, sanitizeProfileImageUrl } from '../lib/userAvatar.js';
+import { normalizeUsername, usernameValidationHint } from '../lib/username.js';
 
 const router = express.Router();
 const SALT_ROUNDS = 10;
 const VERIFICATION_TTL_MS = 48 * 60 * 60 * 1000;
 
+/** Drizzle default `.returning()` lists every column; old DBs missing a column then error. Omit unknown column until migrated. */
+const registerReturning = {
+    id: users.id,
+    first_name: users.first_name,
+    last_name: users.last_name,
+    email: users.email,
+    username: users.username,
+    username_setup_done: users.username_setup_done,
+    date_of_birth: users.date_of_birth,
+    password_hash: users.password_hash,
+    role: users.role,
+    created_at: users.created_at,
+    tdee_onboarding_done: users.tdee_onboarding_done,
+    email_verified: users.email_verified,
+    email_verification_token: users.email_verification_token,
+    email_verification_expires_at: users.email_verification_expires_at,
+    email_verification_sent_at: users.email_verification_sent_at,
+    password_reset_code_hash: users.password_reset_code_hash,
+    password_reset_expires_at: users.password_reset_expires_at,
+    password_reset_sent_at: users.password_reset_sent_at,
+    failed_login_count: users.failed_login_count,
+    profile_image_url: users.profile_image_url,
+};
+
 function stripPassword(userRow) {
     if (!userRow) return null;
     const { password_hash, email_verification_token, password_reset_code_hash, ...rest } = userRow;
     return rest;
+}
+
+function publicUser(userRow) {
+    const u = stripPassword(userRow);
+    if (!u) return null;
+    return { ...u, avatar_url: resolveAvatarUrl(userRow) };
 }
 
 function signToken(user) {
@@ -48,13 +80,9 @@ router.post('/register', async (req, res) => {
         return res.status(400).json({ error: 'Please enter a valid date of birth.' });
     }
 
-    const verifyCode = generateSixDigitCode();
-    const verifyCodeHash = hashEmailCode(verifyCode);
-    const verifyExpires = new Date(Date.now() + VERIFICATION_TTL_MS);
-
     try {
         const password_hash = await bcrypt.hash(password, SALT_ROUNDS);
-        const [user] = await db
+        const [row] = await db
             .insert(users)
             .values({
                 first_name,
@@ -64,37 +92,25 @@ router.post('/register', async (req, res) => {
                 password_hash,
                 role: role === 'coach' ? 'coach' : 'client',
                 tdee_onboarding_done: false,
-                email_verified: false,
-                email_verification_token: verifyCodeHash,
-                email_verification_expires_at: verifyExpires,
-                email_verification_sent_at: new Date(),
+                username_setup_done: false,
+                email_verified: true,
+                email_verification_token: null,
+                email_verification_expires_at: null,
+                email_verification_sent_at: null,
             })
-            .returning();
+            .returning(registerReturning);
 
-        const sent = await sendRegistrationCodeEmail({ to: emailNorm, code: verifyCode });
-        if (!sent.ok) {
-            await db.delete(users).where(eq(users.id, user.id));
-            return res.status(503).json({
-                error: sent.error || 'Could not send verification email. Check RESEND_API_KEY and EMAIL_FROM.',
-            });
-        }
-
-        const body = {
-            message: 'Check your email for a 6-digit code to verify your account before signing in.',
-            email: user.email,
-        };
-        if (sent.skipped && sent.devCode && process.env.NODE_ENV !== 'production') {
-            body.devVerificationCode = sent.devCode;
-        }
-        res.status(201).json(body);
+        const user = { ...row, premium_coaching_active: false };
+        const token = signToken(user);
+        res.status(201).json({ token, user: publicUser(user) });
     } catch (err) {
         if (err.code === '23505') {
-            return res.status(409).json({ error: 'Email already registered' });
+            return res.status(409).json({ error: 'Email or username already taken' });
         }
         console.error('Register error:', err);
         const msg = [err?.message, err?.cause?.message].filter(Boolean).join('\n');
         const isSchema =
-            /premium_coaching_active|tdee_onboarding_done|email_verified|email_verification|password_reset|failed_login_count/i.test(
+            /premium_coaching_active|profile_image_url|username_setup_done|username|tdee_onboarding_done|email_verified|email_verification|password_reset|failed_login_count/i.test(
                 msg
             ) ||
             /42703|undefined_column|column .* does not exist/i.test(msg) ||
@@ -102,7 +118,7 @@ router.post('/register', async (req, res) => {
         if (isSchema) {
             return res.status(503).json({
                 error:
-                    'Database needs updating: open Railway → Postgres → run SQL from backend/migrations/007_premium_coaching.sql (adds premium_coaching_active). Or run: npm run migrate with DATABASE_URL.',
+                    'Database is behind the app schema. From your machine: set DATABASE_URL to this Postgres (Railway → Variables → DATABASE_URL), cd to the leanislaw folder, run npm run migrate. Or run backend/migrations/*.sql in order in the SQL console.',
             });
         }
         res.status(500).json({ error: 'Could not create account' });
@@ -118,35 +134,50 @@ router.post('/login', async (req, res) => {
 
     try {
         const emailNorm = String(email || '').trim().toLowerCase();
-        const rows = await db.select().from(users).where(sql`lower(${users.email}) = ${emailNorm}`).limit(1);
+        // Avoid selecting `email_verified` so older Railway schemas can still login.
+        const rows = await db
+            .select({
+                id: users.id,
+                email: users.email,
+                first_name: users.first_name,
+                last_name: users.last_name,
+                username: users.username,
+                profile_image_url: users.profile_image_url,
+                username_setup_done: users.username_setup_done,
+                tdee_onboarding_done: users.tdee_onboarding_done,
+                password_hash: users.password_hash,
+                role: users.role,
+            })
+            .from(users)
+            .where(sql`lower(${users.email}) = ${emailNorm}`)
+            .limit(1);
         if (rows.length === 0) {
             return res.status(401).json({ error: 'Invalid email or password' });
         }
         const user = rows[0];
         const ok = await bcrypt.compare(password, user.password_hash);
         if (!ok) {
-            const prev = user.failed_login_count ?? 0;
-            const newCount = prev + 1;
-            await db
-                .update(users)
-                .set({ failed_login_count: newCount })
-                .where(eq(users.id, user.id));
+            const newCount = 1;
+            // If failed_login_count doesn't exist yet, ignore.
+            try {
+                await db.update(users).set({ failed_login_count: newCount }).where(eq(users.id, user.id));
+            } catch {
+                // no-op
+            }
             return res.status(401).json({
                 error: 'Invalid email or password',
                 failedLoginCount: newCount,
                 suggestPasswordReset: newCount >= 3,
             });
         }
-        if (!user.email_verified) {
-            return res.status(403).json({
-                error: 'Verify your email first. Enter the code from your email or resend from the sign-up screen.',
-                code: 'EMAIL_NOT_VERIFIED',
-            });
+        // If failed_login_count doesn't exist yet, ignore.
+        try {
+            await db.update(users).set({ failed_login_count: 0 }).where(eq(users.id, user.id));
+        } catch {
+            // no-op
         }
-        await db.update(users).set({ failed_login_count: 0 }).where(eq(users.id, user.id));
-        const safe = stripPassword(user);
         const token = signToken(user);
-        res.json({ token, user: safe });
+        res.json({ token, user: publicUser(user) });
     } catch (err) {
         console.error('Login error:', err);
         res.status(500).json({ error: err.message });
@@ -160,11 +191,24 @@ router.post('/tdee-onboarding/complete', requireAuth, async (req, res) => {
             .update(users)
             .set({ tdee_onboarding_done: true })
             .where(eq(users.id, req.userId));
-        const rows = await db.select().from(users).where(eq(users.id, req.userId)).limit(1);
+        const rows = await db
+            .select({
+                id: users.id,
+                email: users.email,
+                first_name: users.first_name,
+                last_name: users.last_name,
+                username: users.username,
+                username_setup_done: users.username_setup_done,
+                tdee_onboarding_done: users.tdee_onboarding_done,
+                role: users.role,
+            })
+            .from(users)
+            .where(eq(users.id, req.userId))
+            .limit(1);
         if (rows.length === 0) {
             return res.status(404).json({ error: 'User not found' });
         }
-        res.json(stripPassword(rows[0]));
+        res.json(publicUser(rows[0]));
     } catch (err) {
         console.error('tdee-onboarding/complete error:', err);
         res.status(500).json({ error: err.message });
@@ -181,11 +225,24 @@ router.post('/tdee-onboarding/reset', requireAuth, async (req, res) => {
             .update(users)
             .set({ tdee_onboarding_done: false })
             .where(eq(users.id, req.userId));
-        const rows = await db.select().from(users).where(eq(users.id, req.userId)).limit(1);
+        const rows = await db
+            .select({
+                id: users.id,
+                email: users.email,
+                first_name: users.first_name,
+                last_name: users.last_name,
+                username: users.username,
+                username_setup_done: users.username_setup_done,
+                tdee_onboarding_done: users.tdee_onboarding_done,
+                role: users.role,
+            })
+            .from(users)
+            .where(eq(users.id, req.userId))
+            .limit(1);
         if (rows.length === 0) {
             return res.status(404).json({ error: 'User not found' });
         }
-        res.json(stripPassword(rows[0]));
+        res.json(publicUser(rows[0]));
     } catch (err) {
         console.error('tdee-onboarding/reset error:', err);
         res.status(500).json({ error: err.message });
@@ -275,10 +332,10 @@ router.post('/forgot-password', async (req, res) => {
                     password_reset_sent_at: null,
                 })
                 .where(eq(users.id, u.id));
-            return res.status(503).json({ error: sent.error || 'Could not send email' });
+            return res.status(503).json({ error: sent.error || 'Could not send reset code' });
         }
         const fpBody = { ok: true, message };
-        if (sent.skipped && sent.devCode && process.env.NODE_ENV !== 'production') {
+        if (sent.skipped && sent.devCode) {
             fpBody.devResetCode = sent.devCode;
         }
         res.json(fpBody);
@@ -378,10 +435,10 @@ router.post('/resend-verification', async (req, res) => {
 
         const sent = await sendRegistrationCodeEmail({ to: email, code: verifyCode });
         if (!sent.ok) {
-            return res.status(503).json({ error: sent.error || 'Could not send email' });
+            return res.status(503).json({ error: sent.error || 'Could not resend code' });
         }
         const resBody = { ok: true };
-        if (sent.skipped && sent.devCode && process.env.NODE_ENV !== 'production') {
+        if (sent.skipped && sent.devCode) {
             resBody.devVerificationCode = sent.devCode;
         }
         res.json(resBody);
@@ -391,15 +448,127 @@ router.post('/resend-verification', async (req, res) => {
     }
 });
 
+// GET /api/v1/auth/username-available?u= — normalize + check uniqueness (other users only)
+router.get('/username-available', requireAuth, async (req, res) => {
+    const raw = req.query.u ?? req.query.username ?? '';
+    const norm = normalizeUsername(String(raw));
+    if (!norm) {
+        return res.status(400).json({ available: false, error: usernameValidationHint() });
+    }
+    try {
+        const taken = await db
+            .select({ id: users.id })
+            .from(users)
+            .where(and(eq(users.username, norm), ne(users.id, req.userId)))
+            .limit(1);
+        res.json({ available: taken.length === 0, normalized: norm });
+    } catch (err) {
+        console.error('username-available error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // GET /api/v1/auth/me — current user from JWT
 router.get('/me', requireAuth, async (req, res) => {
     try {
-        const rows = await db.select().from(users).where(eq(users.id, req.userId)).limit(1);
+        const rows = await db
+            .select({
+                id: users.id,
+                email: users.email,
+                first_name: users.first_name,
+                last_name: users.last_name,
+                username: users.username,
+                profile_image_url: users.profile_image_url,
+                username_setup_done: users.username_setup_done,
+                tdee_onboarding_done: users.tdee_onboarding_done,
+                role: users.role,
+            })
+            .from(users)
+            .where(eq(users.id, req.userId))
+            .limit(1);
         if (rows.length === 0) {
             return res.status(404).json({ error: 'User not found' });
         }
-        res.json(stripPassword(rows[0]));
+        res.json(publicUser(rows[0]));
     } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// PATCH /api/v1/auth/me — profile_image_url and/or username
+router.patch('/me', requireAuth, async (req, res) => {
+    const hasProfile = 'profile_image_url' in req.body;
+    const hasUsername = 'username' in req.body;
+    if (!hasProfile && !hasUsername) {
+        return res.status(400).json({
+            error: 'Send profile_image_url and/or username (username: string or null to clear).',
+        });
+    }
+    try {
+        const patch = {};
+        if (hasProfile) {
+            const raw = req.body.profile_image_url;
+            if (raw == null || raw === '') {
+                patch.profile_image_url = null;
+            } else {
+                const sanitized = sanitizeProfileImageUrl(raw);
+                if (sanitized === undefined) {
+                    return res.status(400).json({
+                        error: 'profile_image_url must be an https URL or a path starting with /',
+                    });
+                }
+                patch.profile_image_url = sanitized;
+            }
+        }
+        if (hasUsername) {
+            const rawU = req.body.username;
+            if (rawU == null || rawU === '') {
+                patch.username = null;
+                patch.username_setup_done = false;
+            } else {
+                const u = normalizeUsername(rawU);
+                if (u == null) {
+                    return res.status(400).json({ error: usernameValidationHint() });
+                }
+                patch.username = u;
+                patch.username_setup_done = true;
+            }
+        }
+        if (Object.keys(patch).length === 0) {
+            return res.status(400).json({ error: 'Nothing to update' });
+        }
+        await db.update(users).set(patch).where(eq(users.id, req.userId));
+        const rows = await db
+            .select({
+                id: users.id,
+                email: users.email,
+                first_name: users.first_name,
+                last_name: users.last_name,
+                username: users.username,
+                profile_image_url: users.profile_image_url,
+                username_setup_done: users.username_setup_done,
+                tdee_onboarding_done: users.tdee_onboarding_done,
+                role: users.role,
+            })
+            .from(users)
+            .where(eq(users.id, req.userId))
+            .limit(1);
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        res.json(publicUser(rows[0]));
+    } catch (err) {
+        console.error('PATCH /me error:', err);
+        if (err.code === '23505') {
+            return res.status(409).json({ error: 'Username already taken' });
+        }
+        const msg = [err?.message, err?.cause?.message].filter(Boolean).join('\n');
+        if (/profile_image_url|username_setup_done|username|42703|undefined_column|column .* does not exist/i.test(msg)) {
+            return res.status(503).json({
+                error:
+                    'Database needs updating: run npm run migrate (includes 013_username_setup_done.sql, profile image, username).',
+            });
+        }
         res.status(500).json({ error: err.message });
     }
 });

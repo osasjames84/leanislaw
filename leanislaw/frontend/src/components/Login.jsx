@@ -1,9 +1,16 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import {
+    isReactNativeWebView,
+    mergePasswordFieldStyle,
+    passwordInputTypeForWebView,
+    rnWebPasswordExtraProps,
+} from "../lib/rnWebView";
 import ChadPhoto from "../assets/creator_photo.png";
 
 const Login = () => {
+    const rnWeb = isReactNativeWebView();
     const navigate = useNavigate();
     const location = useLocation();
     const [searchParams] = useSearchParams();
@@ -25,6 +32,10 @@ const Login = () => {
         setSubmitting(true);
         try {
             const u = await login(email.trim(), password);
+            if (u?.username_setup_done === false) {
+                navigate("/setup/username", { replace: true });
+                return;
+            }
             if (coachMode) {
                 if (u?.role !== "coach") {
                     throw new Error("This sign-in is for coach accounts only. Use the regular sign in for clients.");
@@ -112,7 +123,7 @@ const Login = () => {
                     <input
                         id="login-email"
                         type="email"
-                        autoComplete="email"
+                        autoComplete={rnWeb ? "off" : "email"}
                         style={field}
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
@@ -123,13 +134,17 @@ const Login = () => {
                     <label style={{ ...label, marginTop: 14 }} htmlFor="login-password">Password</label>
                     <input
                         id="login-password"
-                        type={showPassword ? "text" : "password"}
-                        autoComplete="current-password"
-                        style={field}
+                        type={passwordInputTypeForWebView(rnWeb, showPassword)}
+                        autoComplete={rnWeb ? "off" : "current-password"}
+                        autoCapitalize="off"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        style={mergePasswordFieldStyle(field, rnWeb, showPassword)}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="••••••••"
                         required
+                        {...rnWebPasswordExtraProps(rnWeb)}
                     />
 
                     <label style={showRow}>

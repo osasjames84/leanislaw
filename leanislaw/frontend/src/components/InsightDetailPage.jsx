@@ -6,6 +6,55 @@ import { useDashboardTrend } from "../hooks/useDashboardTrend";
 import { MiniChart } from "./InsightsCharts";
 import { kgToDisplayWeight } from "../units";
 
+const pageWrap = {
+    minHeight: "100vh",
+    boxSizing: "border-box",
+    backgroundColor: "#f2f2f7",
+    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif',
+    paddingBottom: "calc(24px + 62px + env(safe-area-inset-bottom, 0px))",
+};
+
+const navBar = {
+    position: "sticky",
+    top: 0,
+    zIndex: 20,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+    padding: "calc(14px + env(safe-area-inset-top, 0px)) 12px 12px",
+    backgroundColor: "#fff",
+    borderBottom: "0.5px solid #d1d1d6",
+};
+
+const backBtn = {
+    border: "none",
+    background: "none",
+    fontSize: "0.95rem",
+    color: "#007aff",
+    fontWeight: "600",
+    cursor: "pointer",
+    padding: "8px 4px",
+    flexShrink: 0,
+};
+
+const navTitle = {
+    margin: 0,
+    fontSize: "1.05rem",
+    fontWeight: "800",
+    letterSpacing: "-0.2px",
+    color: "#000",
+    textAlign: "center",
+    flex: 1,
+    minWidth: 0,
+};
+
+const navSpacer = { width: 80, flexShrink: 0 };
+
+const content = {
+    padding: "12px 16px 0",
+};
+
 const METRICS = {
     steps: {
         title: "Steps",
@@ -74,15 +123,16 @@ const InsightDetailPage = () => {
     }
 
     return (
-        <div style={{ minHeight: "100vh", background: "#f2f2f7", padding: "12px 16px 110px" }}>
-            <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                <button type="button" onClick={() => navigate("/insights")} style={{ border: "none", background: "none", color: "#007aff", fontWeight: 600, fontSize: "1rem" }}>
+        <div style={pageWrap}>
+            <header style={navBar}>
+                <button type="button" onClick={() => navigate("/insights")} style={backBtn} aria-label="Back to Insights">
                     ← Insights
                 </button>
-                <h1 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 800 }}>{cfg.title}</h1>
-                <span style={{ width: 68 }} />
+                <h1 style={navTitle}>{cfg.title}</h1>
+                <span style={navSpacer} aria-hidden />
             </header>
 
+            <div style={content}>
             <div style={{ background: "#fff", borderRadius: 16, padding: 14, boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
                 <p style={{ margin: "0 0 4px", fontSize: "0.72rem", color: "#8e8e93", fontWeight: 800, letterSpacing: "0.4px", textTransform: "uppercase" }}>
                     {cfg.title}
@@ -121,6 +171,7 @@ const InsightDetailPage = () => {
                         </div>
                     );
                 })}
+            </div>
             </div>
         </div>
     );

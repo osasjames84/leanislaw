@@ -36,7 +36,7 @@ const CheckEmail = () => {
             }
             if (data.devVerificationCode) {
                 setDevCode(data.devVerificationCode);
-                setStatus("Dev mode: use the code shown below (email was not sent — add RESEND_API_KEY to send real mail).");
+                setStatus("Use the code shown below (outgoing email is not enabled yet).");
             } else {
                 setStatus("Sent — check your inbox (and spam).");
             }

@@ -45,7 +45,7 @@ const iconImg = {
 };
 
 const tabs = [
-    { to: "/log/calories", label: "Calories", emoji: "🔥" },
+    { to: "/leaderboard", label: "Leaderboard", emoji: "🏆" },
     { to: "/macros", label: "Macros", emoji: "🥗" },
     { to: "/chat", label: "Chad Bot", image: ChadPhoto },
     { to: "/workout", label: "Workout", emoji: "💪" },
