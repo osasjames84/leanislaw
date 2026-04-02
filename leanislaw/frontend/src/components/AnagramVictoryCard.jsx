@@ -1,7 +1,22 @@
 /**
  * Word-game style result card (green board, 4×4 ? tiles, crown, banner) for chat.
  */
-export default function AnagramVictoryCard({ won, youPts, chadPts, quote }) {
+export default function AnagramVictoryCard({ won, youPts, chadPts, quote, paused }) {
+    if (paused) {
+        return (
+            <div style={card}>
+                <div style={patternBg} />
+                <div style={inner}>
+                    <div style={birdBadge} aria-hidden>
+                        <span style={birdEmoji}>⏸️</span>
+                    </div>
+                    <div style={bannerBar}>ANAGRAMS PAUSED</div>
+                    <p style={scoreLine}>Your round was saved. Open Games → Anagrams to continue.</p>
+                </div>
+            </div>
+        );
+    }
+
     const banner = won ? "YOU WON!" : "CHAD WINS";
     const tiles = Array.from({ length: 16 }, (_, i) => i);
 

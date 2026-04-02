@@ -6,8 +6,13 @@ import ChadPhoto from "../assets/creator_photo.png";
 import Sub5Image from "../assets/sub5.png";
 import AnagramGame from "./AnagramGame";
 import AnagramVictoryCard from "./AnagramVictoryCard";
+import ChessChatCard from "./ChessChatCard";
+import ChessGame from "./ChessGame";
 
 const ANAGRAM_MSG_PREFIX = "[anagram:v1]";
+const CHESS_MSG_PREFIX = "[chess:v1]";
+const LS_CHESS_PAUSE = "leanislaw_chess_pause";
+const LS_ANAGRAM_PAUSE = "leanislaw_anagram_pause";
 
 function parseAnagramPayload(content) {
     const s = String(content ?? "");
@@ -19,11 +24,33 @@ function parseAnagramPayload(content) {
     }
 }
 
+function parseChessPayload(content) {
+    const s = String(content ?? "");
+    if (!s.startsWith(CHESS_MSG_PREFIX)) return null;
+    try {
+        return JSON.parse(s.slice(CHESS_MSG_PREFIX.length));
+    } catch {
+        return null;
+    }
+}
+
 function contentForChatApi(content) {
     const s = String(content ?? "");
+    if (s.startsWith(CHESS_MSG_PREFIX)) {
+        try {
+            const d = JSON.parse(s.slice(CHESS_MSG_PREFIX.length));
+            if (d.paused) return "[Chess] Game paused — open Chess to resume.";
+            if (d.winner === "white") return "[Chess] You won.";
+            if (d.winner === "black") return "[Chess] Chad won.";
+            return "[Chess] Draw.";
+        } catch {
+            return "[Chess] Game update.";
+        }
+    }
     if (!s.startsWith(ANAGRAM_MSG_PREFIX)) return s;
     try {
         const d = JSON.parse(s.slice(ANAGRAM_MSG_PREFIX.length));
+        if (d.paused) return "[Anagrams] Game paused — open Anagrams to resume.";
         const side = d.won ? "You beat Chad" : "Chad won";
         return `[Anagrams] ${side} (${d.youPts ?? 0}–${d.chadPts ?? 0}).`;
     } catch {
@@ -33,7 +60,7 @@ function contentForChatApi(content) {
 
 /** iMessage-style mini-apps: prompt games fill the composer; Anagrams opens the mini-game. */
 const CHAD_GAMES = [
-    { id: "roast", label: "Roast mode", emoji: "🔥", playable: false, prompt: "Roast my worst gym habit in one paragraph — funny, not soft." },
+    { id: "chess", label: "Chess", emoji: "♟️", playable: true },
     {
         id: "wyr",
         label: "Would you rather",
@@ -131,6 +158,10 @@ const CoachChat = () => {
     const [attachOpen, setAttachOpen] = useState(false);
     const [pendingImage, setPendingImage] = useState(null);
     const [anagramOpen, setAnagramOpen] = useState(false);
+    const [anagramResume, setAnagramResume] = useState(null);
+    const [chessOpen, setChessOpen] = useState(false);
+    const [chessBoot, setChessBoot] = useState(null);
+    const [chessSessionKey, setChessSessionKey] = useState(0);
     const [messages, setMessages] = useState([
         {
             role: "assistant",
@@ -241,9 +272,70 @@ const CoachChat = () => {
         await pushUserAndFetch(nextMsgs);
     };
 
+    const appendAssistantStructured = async (content) => {
+        if (!token) return;
+        const cardMsg = { role: "assistant", content };
+        setMessages((prev) => [...prev, cardMsg]);
+        try {
+            await fetch("/api/v1/chat/append", {
+                method: "POST",
+                headers: { ...authBearerHeaders(token), "Content-Type": "application/json" },
+                body: JSON.stringify({ messages: [{ role: "assistant", content }] }),
+            });
+        } catch {
+            /* offline */
+        }
+    };
+
+    const handleChessPause = async ({ fen, difficulty }) => {
+        try {
+            localStorage.setItem(LS_CHESS_PAUSE, JSON.stringify({ fen, difficulty }));
+        } catch {
+            /* ignore */
+        }
+        if (!token) return;
+        const body = { v: 1, paused: true, difficulty };
+        await appendAssistantStructured(`${CHESS_MSG_PREFIX}${JSON.stringify(body)}`);
+    };
+
+    const handleChessFinished = async (payload) => {
+        if (!token) return;
+        try {
+            localStorage.removeItem(LS_CHESS_PAUSE);
+        } catch {
+            /* ignore */
+        }
+        const body = {
+            v: 1,
+            paused: false,
+            winner: payload.winner,
+            resultLabel: payload.resultLabel,
+            difficulty: payload.difficulty,
+            chadQuote: payload.chadQuote || "",
+        };
+        await appendAssistantStructured(`${CHESS_MSG_PREFIX}${JSON.stringify(body)}`);
+    };
+
+    const handleAnagramPause = async (snap) => {
+        try {
+            localStorage.setItem(LS_ANAGRAM_PAUSE, JSON.stringify(snap));
+        } catch {
+            /* ignore */
+        }
+        if (!token) return;
+        const body = { v: 1, paused: true };
+        await appendAssistantStructured(`${ANAGRAM_MSG_PREFIX}${JSON.stringify(body)}`);
+    };
+
     const handleAnagramComplete = async (payload) => {
         if (!token) return;
         setAnagramOpen(false);
+        setAnagramResume(null);
+        try {
+            localStorage.removeItem(LS_ANAGRAM_PAUSE);
+        } catch {
+            /* ignore */
+        }
         const body = {
             v: 1,
             won: payload.won,
@@ -313,12 +405,34 @@ const CoachChat = () => {
             </header>
 
             {anagramOpen ? (
-                <AnagramGame onClose={() => setAnagramOpen(false)} onGameComplete={handleAnagramComplete} />
+                <AnagramGame
+                    resumeSnapshot={anagramResume}
+                    onPause={handleAnagramPause}
+                    onClose={() => {
+                        setAnagramOpen(false);
+                        setAnagramResume(null);
+                    }}
+                    onGameComplete={handleAnagramComplete}
+                />
+            ) : null}
+            {chessOpen ? (
+                <ChessGame
+                    key={chessSessionKey}
+                    token={token}
+                    initialSnapshot={chessBoot}
+                    onPause={handleChessPause}
+                    onFinished={handleChessFinished}
+                    onClose={() => {
+                        setChessOpen(false);
+                        setChessBoot(null);
+                    }}
+                />
             ) : null}
 
             <div style={chatWrap}>
                 {messages.map((m, i) => {
                     const anagram = parseAnagramPayload(m.content);
+                    const chess = parseChessPayload(m.content);
                     return (
                         <div
                             key={`${m.role}-${i}`}
@@ -339,8 +453,17 @@ const CoachChat = () => {
                                 {m.imagePreview ? (
                                     <img src={m.imagePreview} alt="" style={bubbleImage} />
                                 ) : null}
-                                {anagram ? (
+                                {chess ? (
+                                    <ChessChatCard
+                                        paused={Boolean(chess.paused)}
+                                        winner={chess.winner != null ? String(chess.winner) : ""}
+                                        resultLabel={String(chess.resultLabel || "")}
+                                        difficulty={String(chess.difficulty || "")}
+                                        quote={String(chess.chadQuote || "")}
+                                    />
+                                ) : anagram ? (
                                     <AnagramVictoryCard
+                                        paused={Boolean(anagram.paused)}
                                         won={Boolean(anagram.won)}
                                         youPts={Number(anagram.youPts) || 0}
                                         chadPts={Number(anagram.chadPts) || 0}
@@ -385,8 +508,28 @@ const CoachChat = () => {
                                     style={gameTile}
                                     onClick={() => {
                                         setAttachOpen(false);
-                                        if (g.playable) setAnagramOpen(true);
-                                        else chooseGame(g.prompt);
+                                        if (g.id === "anagrams") {
+                                            try {
+                                                const raw = localStorage.getItem(LS_ANAGRAM_PAUSE);
+                                                setAnagramResume(raw ? JSON.parse(raw) : null);
+                                            } catch {
+                                                setAnagramResume(null);
+                                            }
+                                            setAnagramOpen(true);
+                                        } else if (g.id === "chess") {
+                                            if (!token) {
+                                                setError("Log in to play chess.");
+                                                return;
+                                            }
+                                            try {
+                                                const raw = localStorage.getItem(LS_CHESS_PAUSE);
+                                                setChessBoot(raw ? JSON.parse(raw) : null);
+                                            } catch {
+                                                setChessBoot(null);
+                                            }
+                                            setChessSessionKey((k) => k + 1);
+                                            setChessOpen(true);
+                                        } else chooseGame(g.prompt);
                                     }}
                                 >
                                     <span style={gameEmoji}>{g.emoji}</span>

@@ -10,6 +10,7 @@ import strengthRouter from './routes/strength.js';
 import leaderboardRouter from './routes/leaderboard.js';
 import macrosRouter from './routes/macros.js';
 import chatRouter from './routes/chat.js';
+import chessRouter from './routes/chess.js';
 import coachingRouter, { handleStripeCoachingWebhook } from './routes/coaching.js';
 
 const app = express();
@@ -59,6 +60,7 @@ app.use('/api/v1/strength', strengthRouter);
 app.use('/api/v1/leaderboard', leaderboardRouter);
 app.use('/api/v1/macros', macrosRouter);
 app.use('/api/v1/chat', chatRouter);
+app.use('/api/v1/chess', chessRouter);
 app.use('/api/v1/coaching', coachingRouter);
 app.use('/api/v1/users', usersRouter);
 app.use('/api/v1/exercises', exercisesRouter);

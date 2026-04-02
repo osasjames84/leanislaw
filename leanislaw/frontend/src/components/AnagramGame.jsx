@@ -54,6 +54,11 @@ function shuffleArray(arr) {
     return a;
 }
 
+/** Fixed rack positions: slot index stays stable when other letters are picked. */
+function withPoolSlots(tiles) {
+    return tiles.map((t, i) => ({ ...t, poolSlot: i }));
+}
+
 function letterCountsFromWord(word) {
     const m = {};
     for (const c of word.toLowerCase()) {
@@ -170,7 +175,9 @@ function computeWinner(youPts, chadPts, youWords, chadWords) {
  * Full-screen anagram mini-game — Sub-5 profile as backdrop (dashboard look).
  * One 60s round vs Chad: he starts easy; taunting makes him hunt harder words faster.
  */
-export default function AnagramGame({ onClose, onGameComplete }) {
+const ANAGRAM_SNAPSHOT_V = 1;
+
+export default function AnagramGame({ onClose, onGameComplete, resumeSnapshot, onPause }) {
     const [phase, setPhase] = useState("intro");
     const [pool, setPool] = useState([]);
     const [guess, setGuess] = useState([]);
@@ -194,13 +201,25 @@ export default function AnagramGame({ onClose, onGameComplete }) {
     const [chadSolvedWords, setChadSolvedWords] = useState([]);
     const [chadPoints, setChadPoints] = useState(0);
     const [tauntLevel, setTauntLevel] = useState(0);
+    const [masterWord, setMasterWord] = useState("");
     const solvedWordsRef = useRef([]);
     const chadSolvedRef = useRef([]);
     const onGameCompleteRef = useRef(onGameComplete);
     const completeSentRef = useRef(false);
     const endSnapRef = useRef({});
+    const skipNextPlayInitRef = useRef(false);
+    const lastResumeKeyRef = useRef("");
 
     const guessString = useMemo(() => guess.map((t) => t.char).join("").toLowerCase(), [guess]);
+
+    const poolTileBySlot = useMemo(() => {
+        const m = new Map();
+        for (const t of pool) {
+            const s = t.poolSlot;
+            if (typeof s === "number") m.set(s, t);
+        }
+        return m;
+    }, [pool]);
     const wordCount = solvedWords.length;
     const chadWordCount = chadSolvedWords.length;
 
@@ -248,18 +267,67 @@ export default function AnagramGame({ onClose, onGameComplete }) {
     }, []);
 
     useEffect(() => {
+        if (!resumeSnapshot && lastResumeKeyRef.current) {
+            lastResumeKeyRef.current = "";
+        }
+    }, [resumeSnapshot]);
+
+    useEffect(() => {
+        if (!resumeSnapshot || resumeSnapshot.v !== ANAGRAM_SNAPSHOT_V || !dictReady || !englishDictRef.current) {
+            return;
+        }
+        const key = JSON.stringify(resumeSnapshot);
+        if (key === lastResumeKeyRef.current) return;
+        lastResumeKeyRef.current = key;
+
+        skipNextPlayInitRef.current = true;
+        const dict = englishDictRef.current;
+        const master = String(resumeSnapshot.masterWord || "plates").toLowerCase();
+        const sk = Number(resumeSnapshot.sessionKey) || 0;
+        const tiles = tilesForWord(master, sk);
+        bankTilesRef.current = tiles;
+        validWordsRef.current = buildValidWordSet(letterCountsFromWord(master), dict);
+        setMasterWord(master);
+        setSessionKey(sk);
+        setBankLetterCount(tiles.length);
+        setPool(
+            Array.isArray(resumeSnapshot.pool) && resumeSnapshot.pool.length
+                ? resumeSnapshot.pool.map((t) => ({ ...t }))
+                : withPoolSlots(shuffleArray(tiles))
+        );
+        setGuess(Array.isArray(resumeSnapshot.guess) ? resumeSnapshot.guess.map((t) => ({ ...t })) : []);
+        setPoints(Number(resumeSnapshot.points) || 0);
+        setSolvedWords(Array.isArray(resumeSnapshot.solvedWords) ? [...resumeSnapshot.solvedWords] : []);
+        setChadSolvedWords(Array.isArray(resumeSnapshot.chadSolvedWords) ? [...resumeSnapshot.chadSolvedWords] : []);
+        setChadPoints(Number(resumeSnapshot.chadPoints) || 0);
+        setTauntLevel(Number(resumeSnapshot.tauntLevel) || 0);
+        setTimeLeft(Math.max(0, Math.min(SESSION_SECONDS, Number(resumeSnapshot.timeLeft) || 0)));
+        setFeedback("");
+        setFeedbackTone("neutral");
+        completeSentRef.current = false;
+        sessionEndHandled.current = false;
+        setPhase("play");
+    }, [resumeSnapshot, dictReady]);
+
+    useEffect(() => {
         if (phase !== "play" || !dictReady || !englishDictRef.current) return;
+        if (skipNextPlayInitRef.current) {
+            skipNextPlayInitRef.current = false;
+            return;
+        }
         const dict = englishDictRef.current;
         const bank = masterBankRef.current;
         const master = pickMasterWord(dict, bank.length ? bank : ["plates"]);
         const tiles = tilesForWord(master, sessionKey);
         bankTilesRef.current = tiles;
         validWordsRef.current = buildValidWordSet(letterCountsFromWord(master), dict);
+        setMasterWord(master.toLowerCase());
         setBankLetterCount(tiles.length);
-        setPool(shuffleArray(tiles));
+        setPool(withPoolSlots(shuffleArray(tiles)));
         setGuess([]);
         setFeedback("");
         setFeedbackTone("neutral");
+        setTimeLeft(SESSION_SECONDS);
     }, [phase, sessionKey, dictReady]);
 
     useEffect(() => {
@@ -314,7 +382,6 @@ export default function AnagramGame({ onClose, onGameComplete }) {
 
     useEffect(() => {
         if (phase !== "play") return undefined;
-        setTimeLeft(SESSION_SECONDS);
         const id = window.setInterval(() => {
             setTimeLeft((t) => (t <= 1 ? 0 : t - 1));
         }, 1000);
@@ -403,11 +470,11 @@ export default function AnagramGame({ onClose, onGameComplete }) {
     const shufflePool = () => {
         if (phase !== "play") return;
         playUiSound("tap");
-        setPool((p) => shuffleArray(p));
+        setPool((p) => withPoolSlots(shuffleArray(p)));
     };
 
     const returnGuessToPool = () => {
-        setPool((p) => shuffleArray([...p, ...guess]));
+        setPool((p) => withPoolSlots(shuffleArray([...p, ...guess])));
         setGuess([]);
     };
 
@@ -454,7 +521,7 @@ export default function AnagramGame({ onClose, onGameComplete }) {
         window.setTimeout(() => setFloatPoints((fp) => (fp?.id === floatId ? null : fp)), 950);
         setFeedback(CHAD_QUIPS[Math.floor(Math.random() * CHAD_QUIPS.length)]);
         setFeedbackTone("ok");
-        setPool(shuffleArray([...bankTilesRef.current]));
+        setPool(withPoolSlots(shuffleArray([...bankTilesRef.current])));
         setGuess([]);
         window.setTimeout(() => {
             setFeedback("");
@@ -506,6 +573,21 @@ export default function AnagramGame({ onClose, onGameComplete }) {
                     style={closeFab}
                     onClick={() => {
                         playUiSound("soft");
+                        if (phase === "play" && typeof onPause === "function" && masterWord) {
+                            onPause({
+                                v: ANAGRAM_SNAPSHOT_V,
+                                masterWord,
+                                sessionKey,
+                                timeLeft,
+                                points,
+                                solvedWords,
+                                chadSolvedWords,
+                                chadPoints,
+                                tauntLevel,
+                                pool,
+                                guess,
+                            });
+                        }
                         onClose();
                     }}
                     aria-label="Close game"
@@ -596,23 +678,29 @@ export default function AnagramGame({ onClose, onGameComplete }) {
                                     </div>
                                 </div>
                             </div>
-                            {tauntLevel > 0 && phase === "play" ? (
-                                <div style={aggroHint}>{tauntLevel > 1 ? "Chad is tilted — good luck." : "Chad stopped going easy."}</div>
-                            ) : null}
+                            <div style={{ ...aggroHintSlot, minHeight: phase === "play" ? 26 : 0 }}>
+                                {tauntLevel > 0 && phase === "play" ? (
+                                    <div style={aggroHint}>
+                                        {tauntLevel > 1 ? "Chad is tilted — good luck." : "Chad stopped going easy."}
+                                    </div>
+                                ) : null}
+                            </div>
                         </div>
 
-                        {feedback ? (
-                            <div
-                                style={{
-                                    ...feedbackBar,
-                                    ...(feedbackTone === "bad" ? feedbackBarBad : {}),
-                                    ...(feedbackTone === "ok" ? feedbackBarOk : {}),
-                                    ...(feedbackTone === "warn" ? feedbackBarWarn : {}),
-                                }}
-                            >
-                                {feedback}
-                            </div>
-                        ) : null}
+                        <div style={feedbackSlot} aria-live="polite">
+                            {feedback ? (
+                                <div
+                                    style={{
+                                        ...feedbackBarText,
+                                        ...(feedbackTone === "bad" ? feedbackBarBad : {}),
+                                        ...(feedbackTone === "ok" ? feedbackBarOk : {}),
+                                        ...(feedbackTone === "warn" ? feedbackBarWarn : {}),
+                                    }}
+                                >
+                                    {feedback}
+                                </div>
+                            ) : null}
+                        </div>
 
                         {phase === "play" ? (
                             <>
@@ -642,12 +730,26 @@ export default function AnagramGame({ onClose, onGameComplete }) {
                                     </div>
                                 </div>
 
-                                <div style={poolRow}>
-                                    {pool.map((t) => (
-                                        <button key={t.id} type="button" style={woodTile} onClick={() => movePoolToGuess(t)}>
-                                            {t.char}
-                                        </button>
-                                    ))}
+                                <div
+                                    style={{
+                                        ...poolRow,
+                                        gridTemplateColumns: `repeat(${bankLetterCount || 6}, minmax(0, 1fr))`,
+                                    }}
+                                >
+                                    {Array.from({ length: bankLetterCount }, (_, slot) => {
+                                        const t = poolTileBySlot.get(slot);
+                                        return (
+                                            <div key={`slot-${slot}`} style={poolSlotCell}>
+                                                {t ? (
+                                                    <button type="button" style={woodTile} onClick={() => movePoolToGuess(t)}>
+                                                        {t.char}
+                                                    </button>
+                                                ) : (
+                                                    <div style={poolSlotEmpty} aria-hidden />
+                                                )}
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </>
                         ) : null}
@@ -955,21 +1057,41 @@ const scoreAvatarChad = {
     flexShrink: 0,
 };
 
-const aggroHint = {
+const aggroHintSlot = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
     marginTop: 4,
+    boxSizing: "border-box",
+};
+
+const aggroHint = {
     fontSize: "0.72rem",
     fontWeight: "700",
     color: "#8b2c2c",
     textAlign: "center",
+    margin: 0,
 };
 
-const feedbackBar = {
+/** Fixed-height band so Chad lines don’t push the letter rack up/down when they flash. */
+const feedbackSlot = {
+    minHeight: 50,
+    marginBottom: 12,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingLeft: 12,
+    paddingRight: 12,
+    boxSizing: "border-box",
+};
+
+const feedbackBarText = {
     textAlign: "center",
     fontSize: "0.88rem",
     fontWeight: "650",
     color: "#f0ebff",
-    marginBottom: 12,
-    minHeight: 22,
+    lineHeight: 1.35,
+    margin: 0,
 };
 
 const feedbackBarBad = { color: "#ffc9c9" };
@@ -1061,11 +1183,30 @@ const slotFilled = {
 };
 
 const poolRow = {
-    display: "flex",
+    display: "grid",
     justifyContent: "center",
     gap: 10,
-    flexWrap: "wrap",
     paddingBottom: 8,
+    maxWidth: 400,
+    margin: "0 auto",
+    width: "100%",
+    boxSizing: "border-box",
+};
+
+const poolSlotCell = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 0,
+};
+
+const poolSlotEmpty = {
+    width: 48,
+    height: 54,
+    borderRadius: 10,
+    border: "2px solid transparent",
+    boxSizing: "border-box",
+    flexShrink: 0,
 };
 
 const woodTile = {

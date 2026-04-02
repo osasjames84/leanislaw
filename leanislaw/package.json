@@ -11,7 +11,8 @@
     "dev": "nodemon backend/server.js",
     "start": "node backend/server.js",
     "seed-demo-analytics": "node backend/scripts/seed-dashboard-demo.js",
-    "migrate": "node backend/scripts/apply-sql-migrations.js"
+    "migrate": "node backend/scripts/apply-sql-migrations.js",
+    "chess-ai": "cd chess-ai-service && python3 -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload"
   },
   "keywords": [],
   "author": "",
