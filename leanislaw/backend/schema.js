@@ -70,6 +70,30 @@ export const userFriendships = pgTable(
   (t) => [primaryKey({ columns: [t.user_a_id, t.user_b_id] })]
 );
 
+export const friendRequests = pgTable('friend_requests', {
+  id: serial('id').primaryKey(),
+  from_user_id: integer('from_user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  to_user_id: integer('to_user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  status: varchar('status', { length: 20 }).notNull().default('pending'),
+  created_at: timestamp('created_at').defaultNow(),
+});
+
+export const directMessages = pgTable('direct_messages', {
+  id: serial('id').primaryKey(),
+  sender_id: integer('sender_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  recipient_id: integer('recipient_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  content: text('content').notNull(),
+  created_at: timestamp('created_at').defaultNow(),
+});
+
 // Exercises table
 export const exercises = pgTable('exercises', {
   id: serial('id').primaryKey(),

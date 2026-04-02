@@ -23,6 +23,8 @@ import MacroTracking from "./components/MacroTracking";
 import InsightsPage from "./components/InsightsPage";
 import InsightDetailPage from "./components/InsightDetailPage";
 import CoachChat from "./components/CoachChat";
+import ChatInbox from "./components/ChatInbox";
+import FriendDM from "./components/FriendDM";
 import CoachRoute from "./components/CoachRoute";
 import CoachDashboard from "./components/CoachDashboard";
 import PremiumCoaching from "./components/PremiumCoaching";
@@ -65,7 +67,9 @@ const App = () => {
               <Route path="/tdee" element={<TdeeCalculator />} />
               <Route path="/workout/:sessionId" element={<WorkoutArea />} />
               <Route path="/workout" element={<WorkoutArea />} />
-              <Route path="/chat" element={<CoachChat />} />
+              <Route path="/chat" element={<ChatInbox />} />
+              <Route path="/chat/chad" element={<CoachChat />} />
+              <Route path="/chat/friend/:friendId" element={<FriendDM />} />
               <Route path="/premium-coaching" element={<PremiumCoaching />} />
               <Route
                 path="/coach"

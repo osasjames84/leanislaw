@@ -47,7 +47,7 @@ const iconImg = {
 const tabs = [
     { to: "/leaderboard", label: "Leaderboard", emoji: "🏆" },
     { to: "/macros", label: "Macros", emoji: "🥗" },
-    { to: "/chat", label: "Chad Bot", image: ChadPhoto },
+    { to: "/chat", label: "Chats", image: ChadPhoto },
     { to: "/workout", label: "Workout", emoji: "💪" },
 ];
 
@@ -62,7 +62,7 @@ const BottomNav = () => (
                     color: isActive ? "#007aff" : "#636366",
                     backgroundColor: isActive ? "rgba(0, 122, 255, 0.1)" : "transparent",
                 })}
-                end
+                end={to !== "/chat" && to !== "/workout"}
             >
                 {image ? (
                     <img src={image} alt="" aria-hidden style={iconImg} />

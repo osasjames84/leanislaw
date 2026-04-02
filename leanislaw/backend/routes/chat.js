@@ -442,6 +442,40 @@ router.post('/append', requireAuth, async (req, res) => {
     }
 });
 
+/** One-line preview for DM-style inbox (Chad thread). */
+router.get('/preview', requireAuth, async (req, res) => {
+    try {
+        const userId = Number(req.userId);
+        await ensureChatHistoryTable();
+        const r = await pool.query(
+            `SELECT role, content, created_at
+             FROM chat_messages
+             WHERE user_id = $1
+             ORDER BY created_at DESC, id DESC
+             LIMIT 1`,
+            [userId]
+        );
+        const row = r.rows[0];
+        if (!row) {
+            return res.json({});
+        }
+        let preview = String(row.content || '')
+            .replace(/\s+/g, ' ')
+            .trim();
+        if (preview.length > 80) {
+            preview = `${preview.slice(0, 77)}…`;
+        }
+        res.json({
+            preview,
+            last_at: row.created_at,
+            last_from_me: row.role === 'user',
+        });
+    } catch (err) {
+        console.error('GET /chat/preview error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 router.get('/history', requireAuth, async (req, res) => {
     try {
         const userId = Number(req.userId);

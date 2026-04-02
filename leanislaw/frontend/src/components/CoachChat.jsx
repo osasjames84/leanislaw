@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { authBearerHeaders } from "../apiHeaders";
 import ChadPhoto from "../assets/creator_photo.png";
-import Sub5Image from "../assets/sub5.png";
+import { userAvatarUrl } from "../lib/userAvatar";
 import AnagramGame from "./AnagramGame";
 import AnagramVictoryCard from "./AnagramVictoryCard";
 import ChessChatCard from "./ChessChatCard";
@@ -195,7 +195,8 @@ function messagesToApiPayload(msgs) {
 
 const CoachChat = () => {
     const navigate = useNavigate();
-    const { token } = useAuth();
+    const location = useLocation();
+    const { token, user } = useAuth();
     const fileInputRef = useRef(null);
     const cameraInputRef = useRef(null);
     const inputRef = useRef(null);
@@ -272,6 +273,13 @@ const CoachChat = () => {
             /* ignore */
         }
     }, []);
+
+    useEffect(() => {
+        if (location.state?.openAttach) {
+            setAttachOpen(true);
+            navigate(location.pathname, { replace: true, state: {} });
+        }
+    }, [location.pathname, location.state, navigate]);
 
     useEffect(() => {
         if (!token) return;
@@ -599,8 +607,8 @@ const CoachChat = () => {
             />
 
             <header style={header}>
-                <button type="button" style={backBtn} onClick={() => navigate("/dashboard")}>
-                    ← Home
+                <button type="button" style={backBtn} onClick={() => navigate("/chat")}>
+                    ← Chats
                 </button>
                 <h1 style={title}>Chad Bot</h1>
                 <span style={headerSpacer} aria-hidden />
@@ -678,7 +686,9 @@ const CoachChat = () => {
                                     <div>{renderWithBold(m.content)}</div>
                                 ) : null}
                             </div>
-                            {m.role === "user" ? <img src={Sub5Image} alt="Sub-5" style={avatar} /> : null}
+                            {m.role === "user" ? (
+                                <img src={userAvatarUrl(user)} alt="" style={avatar} />
+                            ) : null}
                         </div>
                     );
                 })}

@@ -15,6 +15,10 @@ export default function ProfilePage() {
     const [workoutCount, setWorkoutCount] = useState(0);
     const [friends, setFriends] = useState([]);
     const [friendsLoadError, setFriendsLoadError] = useState("");
+    const [incomingRequests, setIncomingRequests] = useState([]);
+    const [outgoingRequests, setOutgoingRequests] = useState([]);
+    const [requestsLoadError, setRequestsLoadError] = useState("");
+    const [friendSuccess, setFriendSuccess] = useState("");
 
     const [usernameInput, setUsernameInput] = useState("");
     const [usernameError, setUsernameError] = useState("");
@@ -76,8 +80,8 @@ export default function ProfilePage() {
                         ? "Sign in again — your session may have expired."
                         : res.status === 404
                           ? "Friends API missing on the server (404). In Railway: Redeploy latest main, set Root Directory to leanislaw (or repo root with root package.json), and run migration 015."
-                          : res.status === 503
-                            ? "Database may need migration 015 (user_friendships). On Railway: redeploy so startup migrations run, or run npm run migrate with DATABASE_URL."
+                            : res.status === 503
+                            ? "Database may need migrations 015 (friendships) and 016 (friend requests). Redeploy or run npm run migrate with DATABASE_URL."
                             : res.status === 403
                               ? "Verify your email, or sign in again."
                               : `Could not load friends (${res.status}).`;
@@ -94,9 +98,64 @@ export default function ProfilePage() {
         }
     }, [token]);
 
+    const loadFriendRequests = useCallback(async () => {
+        if (!token) {
+            setIncomingRequests([]);
+            setOutgoingRequests([]);
+            return;
+        }
+        setRequestsLoadError("");
+        const headers = authBearerHeaders(token);
+        try {
+            const [incRes, outRes] = await Promise.all([
+                fetch("/api/v1/social/friend-requests/incoming", { headers }),
+                fetch("/api/v1/social/friend-requests/outgoing", { headers }),
+            ]);
+            const parse = async (res) => {
+                const raw = await res.text();
+                try {
+                    return raw ? JSON.parse(raw) : null;
+                } catch {
+                    return null;
+                }
+            };
+            const incData = await parse(incRes);
+            const outData = await parse(outRes);
+            if (!incRes.ok) {
+                const msg =
+                    incRes.status === 503 && typeof incData?.error === "string"
+                        ? incData.error
+                        : `Could not load friend requests (${incRes.status}).`;
+                setRequestsLoadError(msg);
+                setIncomingRequests([]);
+                setOutgoingRequests([]);
+                return;
+            }
+            if (!outRes.ok) {
+                setRequestsLoadError(
+                    outRes.status === 503 && typeof outData?.error === "string"
+                        ? outData.error
+                        : `Could not load outgoing requests (${outRes.status}).`,
+                );
+                setOutgoingRequests([]);
+            } else {
+                setOutgoingRequests(Array.isArray(outData) ? outData : []);
+            }
+            setIncomingRequests(Array.isArray(incData) ? incData : []);
+        } catch {
+            setRequestsLoadError("Couldn’t load friend requests.");
+            setIncomingRequests([]);
+            setOutgoingRequests([]);
+        }
+    }, [token]);
+
     useEffect(() => {
         void loadFriends();
     }, [loadFriends]);
+
+    useEffect(() => {
+        void loadFriendRequests();
+    }, [loadFriendRequests]);
 
     const checkAvailable = useCallback(
         async (norm) => {
@@ -298,6 +357,7 @@ export default function ProfilePage() {
 
     const handleAddFriend = async () => {
         setFriendError("");
+        setFriendSuccess("");
         const raw = String(friendUidInput).trim().replace(/^@/, "");
         if (!raw) {
             setFriendError("Enter a UID or username.");
@@ -336,20 +396,30 @@ export default function ProfilePage() {
                 setFriendError(data.error || "User not found.");
                 return;
             }
-            if (!res.ok && res.status !== 200) {
-                setFriendError(data.error || "Could not add friend.");
+            if (!res.ok && res.status !== 200 && res.status !== 202) {
+                setFriendError(data.error || "Could not send friend request.");
                 return;
             }
-            if (data.id) {
-                setFriends((prev) => {
-                    if (prev.some((p) => p.id === data.id)) return prev;
-                    return [...prev, data];
-                });
+            if (data.friendshipCreated || data.alreadyFriends) {
+                if (data.id) {
+                    setFriends((prev) => {
+                        if (prev.some((p) => p.id === data.id)) return prev;
+                        return [...prev, data];
+                    });
+                }
+                setFriendSuccess(
+                    data.alreadyFriends ? "You’re already friends with that person." : "You’re now friends.",
+                );
+            } else if (data.requestSent) {
+                setFriendSuccess("Friend request sent. They’ll see it under Friend requests.");
+            } else if (data.requestPending) {
+                setFriendSuccess("You already have a pending request to that person.");
             }
+            void loadFriendRequests();
             setFriendUidInput("");
             setLookupPreview(null);
         } catch {
-            setFriendError("Could not add friend.");
+            setFriendError("Could not send friend request.");
         } finally {
             setFriendBusy(false);
         }
@@ -366,6 +436,75 @@ export default function ProfilePage() {
             setFriends((prev) => prev.filter((f) => f.id !== friendId));
         } catch {
             /* noop */
+        }
+    };
+
+    const handleAcceptRequest = async (requestId) => {
+        if (!token) return;
+        setFriendError("");
+        setFriendSuccess("");
+        try {
+            const res = await fetch(`/api/v1/social/friend-requests/${requestId}/accept`, {
+                method: "POST",
+                headers: authBearerHeaders(token),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                setFriendError(data.error || "Could not accept request.");
+                return;
+            }
+            if (data.id) {
+                setFriends((prev) => {
+                    if (prev.some((p) => p.id === data.id)) return prev;
+                    return [...prev, data];
+                });
+            }
+            setFriendSuccess("Request accepted — you’re now friends.");
+            void loadFriendRequests();
+        } catch {
+            setFriendError("Could not accept request.");
+        }
+    };
+
+    const handleDeclineRequest = async (requestId) => {
+        if (!token) return;
+        setFriendError("");
+        setFriendSuccess("");
+        try {
+            const res = await fetch(`/api/v1/social/friend-requests/${requestId}/decline`, {
+                method: "POST",
+                headers: authBearerHeaders(token),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                setFriendError(data.error || "Could not decline.");
+                return;
+            }
+            setFriendSuccess("Request declined.");
+            void loadFriendRequests();
+        } catch {
+            setFriendError("Could not decline request.");
+        }
+    };
+
+    const handleCancelOutgoing = async (requestId) => {
+        if (!token) return;
+        setFriendError("");
+        setFriendSuccess("");
+        try {
+            const res = await fetch(`/api/v1/social/friend-requests/${requestId}`, {
+                method: "DELETE",
+                headers: authBearerHeaders(token),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                setFriendError(data.error || "Could not cancel request.");
+                return;
+            }
+            setFriendSuccess("Request cancelled.");
+            void loadFriendRequests();
+        } catch {
+            setFriendError("Could not cancel request.");
         }
     };
 
@@ -568,10 +707,93 @@ export default function ProfilePage() {
             <div style={card}>
                 <h2 style={sectionTitle}>Friends</h2>
                 <p style={hint}>
-                    Search by <strong>UID</strong> or <strong>@username</strong>. UIDs only match users in{" "}
-                    <strong>this</strong> deployment (production Vercel ↔ Railway is one world; local dev is another).
+                    Send a <strong>friend request</strong> by UID or @username. They accept from{" "}
+                    <strong>Friend requests</strong> below. If they already requested you, sending once connects you
+                    as friends. UIDs only match users in <strong>this</strong> deployment.
                 </p>
                 {friendsLoadError ? <div style={errBox}>{friendsLoadError}</div> : null}
+                {requestsLoadError ? <div style={errBox}>{requestsLoadError}</div> : null}
+
+                {incomingRequests.length > 0 ? (
+                    <div style={{ marginBottom: 16 }}>
+                        <h3 style={subSectionTitle}>Friend requests</h3>
+                        <ul style={{ listStyle: "none", margin: "8px 0 0", padding: 0 }}>
+                            {incomingRequests.map((req) => {
+                                const f = req.from;
+                                if (!f) return null;
+                                return (
+                                    <li key={req.id} style={friendRow}>
+                                        <img
+                                            src={f.avatar_url || "/sub5.png"}
+                                            alt=""
+                                            width={44}
+                                            height={44}
+                                            style={{ borderRadius: 12, objectFit: "cover" }}
+                                        />
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <p style={{ margin: 0, fontWeight: 700 }}>
+                                                {f.username ? `@${f.username}` : `${f.first_name} ${f.last_name}`}
+                                            </p>
+                                            <p style={{ margin: "4px 0 0", fontSize: 13, color: "#8e8e93" }}>
+                                                UID {f.id}
+                                            </p>
+                                        </div>
+                                        <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                                            <button
+                                                type="button"
+                                                style={primaryBtn}
+                                                onClick={() => handleAcceptRequest(req.id)}
+                                            >
+                                                Accept
+                                            </button>
+                                            <button
+                                                type="button"
+                                                style={ghostBtn}
+                                                onClick={() => handleDeclineRequest(req.id)}
+                                            >
+                                                Decline
+                                            </button>
+                                        </div>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    </div>
+                ) : null}
+
+                {outgoingRequests.length > 0 ? (
+                    <div style={{ marginBottom: 16 }}>
+                        <h3 style={subSectionTitle}>Sent requests</h3>
+                        <ul style={{ listStyle: "none", margin: "8px 0 0", padding: 0 }}>
+                            {outgoingRequests.map((req) => {
+                                const f = req.to;
+                                if (!f) return null;
+                                return (
+                                    <li key={req.id} style={friendRow}>
+                                        <img
+                                            src={f.avatar_url || "/sub5.png"}
+                                            alt=""
+                                            width={44}
+                                            height={44}
+                                            style={{ borderRadius: 12, objectFit: "cover" }}
+                                        />
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <p style={{ margin: 0, fontWeight: 700 }}>
+                                                {f.username ? `@${f.username}` : `${f.first_name} ${f.last_name}`}
+                                            </p>
+                                            <p style={{ margin: "4px 0 0", fontSize: 13, color: "#8e8e93" }}>
+                                                Pending · UID {f.id}
+                                            </p>
+                                        </div>
+                                        <button type="button" style={ghostBtn} onClick={() => handleCancelOutgoing(req.id)}>
+                                            Cancel
+                                        </button>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    </div>
+                ) : null}
 
                 <div style={addRow}>
                     <input
@@ -587,10 +809,15 @@ export default function ProfilePage() {
                         {lookupBusy ? "…" : "Look up"}
                     </button>
                     <button type="button" style={primaryBtn} onClick={handleAddFriend} disabled={friendBusy}>
-                        Add
+                        {friendBusy ? "…" : "Send request"}
                     </button>
                 </div>
                 {friendError ? <div style={errBox}>{friendError}</div> : null}
+                {friendSuccess ? (
+                    <p style={{ margin: "8px 0 0", fontSize: 14, color: "#248a3d" }} role="status">
+                        {friendSuccess}
+                    </p>
+                ) : null}
 
                 {lookupPreview ? (
                     <div style={previewCard}>
@@ -923,6 +1150,7 @@ const avatarEditPanel = {
 const bigAvatar = { borderRadius: 16, border: "1px solid #d1d1d6", objectFit: "cover", display: "block" };
 const muted = { color: "#8e8e93", textAlign: "center", padding: 40 };
 const sectionTitle = { margin: "20px 0 12px", fontSize: "0.95rem", fontWeight: 800 };
+const subSectionTitle = { margin: "0 0 4px", fontSize: "0.85rem", fontWeight: 700, color: "#3a3a3c" };
 const input = {
     width: "100%",
     boxSizing: "border-box",
