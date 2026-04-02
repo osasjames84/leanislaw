@@ -33,7 +33,7 @@ const DIFF_OPTS = [
  * Full-screen chess vs Chad (Black). Negamax AI via Python service.
  * Drag pieces or tap a piece then a highlighted square.
  */
-export default function ChessGame({ onClose, token, initialSnapshot, onPause, onFinished }) {
+export default function ChessGame({ onClose, token, initialSnapshot, onPause, onFinished, onNewGame }) {
     const gameRef = useRef(new Chess());
     const [fen, setFen] = useState(() => gameRef.current.fen());
     const [thinking, setThinking] = useState(false);
@@ -236,6 +236,7 @@ export default function ChessGame({ onClose, token, initialSnapshot, onPause, on
         setSelectedSquare(null);
         endReportedRef.current = false;
         lastQuoteRef.current = "";
+        onNewGame?.();
     };
 
     const canDragPiece = useCallback(

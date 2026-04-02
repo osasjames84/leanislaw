@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { authBearerHeaders } from "../apiHeaders";
@@ -13,6 +13,14 @@ const ANAGRAM_MSG_PREFIX = "[anagram:v1]";
 const CHESS_MSG_PREFIX = "[chess:v1]";
 const LS_CHESS_PAUSE = "leanislaw_chess_pause";
 const LS_ANAGRAM_PAUSE = "leanislaw_anagram_pause";
+/** Last chess pause we posted (fen + difficulty). */
+const LS_CHESS_PAUSE_CHAT_SIG = "leanislaw_chess_pause_chat_sig";
+/** Last anagram pause chat card signature (avoid resume→close spam). */
+const LS_ANAGRAM_PAUSE_CHAT_LAST_SIG = "leanislaw_anagram_pause_chat_last_sig";
+
+function makePauseId() {
+    return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
 
 function parseAnagramPayload(content) {
     const s = String(content ?? "");
@@ -32,6 +40,46 @@ function parseChessPayload(content) {
     } catch {
         return null;
     }
+}
+
+/**
+ * Keep the thread tidy for paused cards in the UI.
+ *
+ * - New cards have `pauseId` and should be independently clickable/resumable.
+ * - Legacy cards (from older app versions) don't have `pauseId`, so we collapse them
+ *   to a single "legacy" paused card per game type to avoid stacking.
+ */
+function keepLatestPausedByKey(msgs) {
+    const seen = new Set();
+    const keep = new Array(msgs.length).fill(false);
+
+    for (let i = msgs.length - 1; i >= 0; i--) {
+        const m = msgs[i];
+        if (m?.role === "assistant") {
+            const an = parseAnagramPayload(m.content);
+            if (an?.paused) {
+                const key = an.pauseId ? `anagram:${an.pauseId}` : "anagram:legacy";
+                if (seen.has(key)) continue;
+                seen.add(key);
+                keep[i] = true;
+                continue;
+            }
+
+            const ch = parseChessPayload(m.content);
+            if (ch?.paused) {
+                const key = ch.pauseId ? `chess:${ch.pauseId}` : "chess:legacy";
+                if (seen.has(key)) continue;
+                seen.add(key);
+                keep[i] = true;
+                continue;
+            }
+        }
+
+        // Non-paused messages are always kept.
+        keep[i] = true;
+    }
+
+    return msgs.filter((_, idx) => keep[idx]);
 }
 
 function contentForChatApi(content) {
@@ -169,10 +217,61 @@ const CoachChat = () => {
         },
     ]);
 
+    const messagesForRender = useMemo(() => keepLatestPausedByKey(messages), [messages]);
+
     const canSend = useMemo(
         () => Boolean(token && (input.trim().length > 0 || pendingImage) && !loading),
         [token, input, pendingImage, loading]
     );
+
+    const resumePausedChessFromChat = useCallback((chessPayload) => {
+        if (!token) {
+            setError("Log in to play chess.");
+            return;
+        }
+        setAnagramOpen(false);
+        setAnagramResume(null);
+
+        try {
+            const fen = chessPayload?.fen;
+            const difficulty = chessPayload?.difficulty;
+            if (typeof fen === "string" && fen.length) {
+                setChessBoot({ fen, difficulty: difficulty || "medium" });
+            } else {
+                const raw = localStorage.getItem(LS_CHESS_PAUSE);
+                setChessBoot(raw ? JSON.parse(raw) : null);
+            }
+        } catch {
+            setChessBoot(null);
+        }
+
+        setChessSessionKey((k) => k + 1);
+        setChessOpen(true);
+    }, [token]);
+
+    const resumePausedAnagramFromChat = useCallback((anagramPayload) => {
+        setChessOpen(false);
+        setChessBoot(null);
+
+        const pauseId = anagramPayload?.pauseId;
+        const key = pauseId ? `${LS_ANAGRAM_PAUSE}_${pauseId}` : LS_ANAGRAM_PAUSE;
+        try {
+            const raw = localStorage.getItem(key);
+            setAnagramResume(raw ? JSON.parse(raw) : null);
+        } catch {
+            setAnagramResume(null);
+        }
+
+        setAnagramOpen(true);
+    }, []);
+
+    const clearChessPauseChatSig = useCallback(() => {
+        try {
+            localStorage.removeItem(LS_CHESS_PAUSE_CHAT_SIG);
+        } catch {
+            /* ignore */
+        }
+    }, []);
 
     useEffect(() => {
         if (!token) return;
@@ -287,6 +386,21 @@ const CoachChat = () => {
         }
     };
 
+    /** Append a paused card. UI de-dupes for display; we still keep history entries. */
+    const appendAssistantPausedCard = async (kind, content) => {
+        if (!token) return;
+        setMessages((prev) => [...prev, { role: "assistant", content }]);
+        try {
+            await fetch("/api/v1/chat/append", {
+                method: "POST",
+                headers: { ...authBearerHeaders(token), "Content-Type": "application/json" },
+                body: JSON.stringify({ messages: [{ role: "assistant", content }] }),
+            });
+        } catch {
+            /* offline */
+        }
+    };
+
     const handleChessPause = async ({ fen, difficulty }) => {
         try {
             localStorage.setItem(LS_CHESS_PAUSE, JSON.stringify({ fen, difficulty }));
@@ -294,14 +408,30 @@ const CoachChat = () => {
             /* ignore */
         }
         if (!token) return;
-        const body = { v: 1, paused: true, difficulty };
-        await appendAssistantStructured(`${CHESS_MSG_PREFIX}${JSON.stringify(body)}`);
+        const sig = `${fen}\t${difficulty}`;
+        try {
+            // If this exact paused state already exists in the chat, don't append another copy.
+            const existsInChat = messages.some((m) => {
+                const p = parseChessPayload(m.content);
+                return Boolean(p?.paused && p.fen === fen && String(p.difficulty || "") === String(difficulty));
+            });
+            if (existsInChat) return;
+
+            if (localStorage.getItem(LS_CHESS_PAUSE_CHAT_SIG) === sig) return;
+            localStorage.setItem(LS_CHESS_PAUSE_CHAT_SIG, sig);
+        } catch {
+            /* ignore */
+        }
+        const pauseId = makePauseId();
+        const body = { v: 1, paused: true, pauseId, difficulty, fen };
+        await appendAssistantPausedCard("chess", `${CHESS_MSG_PREFIX}${JSON.stringify(body)}`);
     };
 
     const handleChessFinished = async (payload) => {
         if (!token) return;
         try {
             localStorage.removeItem(LS_CHESS_PAUSE);
+            localStorage.removeItem(LS_CHESS_PAUSE_CHAT_SIG);
         } catch {
             /* ignore */
         }
@@ -317,14 +447,85 @@ const CoachChat = () => {
     };
 
     const handleAnagramPause = async (snap) => {
+        // Always update the latest snapshot (legacy fallback / resume).
         try {
             localStorage.setItem(LS_ANAGRAM_PAUSE, JSON.stringify(snap));
         } catch {
             /* ignore */
         }
+
         if (!token) return;
-        const body = { v: 1, paused: true };
-        await appendAssistantStructured(`${ANAGRAM_MSG_PREFIX}${JSON.stringify(body)}`);
+
+        // Stable signature: exclude timer/pool ordering so closing & resuming doesn't spam.
+        const masterWordLower = String(snap.masterWord || "").toLowerCase();
+        const sessionKey = Number(snap.sessionKey) || 0;
+        const points = Number(snap.points) || 0;
+        const chadPoints = Number(snap.chadPoints) || 0;
+        const tauntLevel = Number(snap.tauntLevel) || 0;
+        const solvedCount = Array.isArray(snap.solvedWords) ? snap.solvedWords.length : 0;
+        const chadSolvedCount = Array.isArray(snap.chadSolvedWords) ? snap.chadSolvedWords.length : 0;
+
+        const signature = [
+            masterWordLower,
+            String(sessionKey),
+            String(points),
+            String(chadPoints),
+            String(tauntLevel),
+            String(solvedCount),
+            String(chadSolvedCount),
+        ].join("\t");
+
+        try {
+            // If this exact paused state already exists in chat, don't append again.
+            const existsInChat = messages.some((m) => {
+                const p = parseAnagramPayload(m.content);
+                return (
+                    Boolean(p?.paused) &&
+                    String(p.masterWord || "").toLowerCase() === masterWordLower &&
+                    Number(p.sessionKey) === sessionKey &&
+                    Number(p.points) === points &&
+                    Number(p.chadPoints) === chadPoints &&
+                    Number(p.tauntLevel) === tauntLevel &&
+                    Number(p.solvedCount) === solvedCount &&
+                    Number(p.chadSolvedCount) === chadSolvedCount
+                );
+            });
+            if (existsInChat) return;
+        } catch {
+            /* ignore */
+        }
+
+        try {
+            const prevSig = localStorage.getItem(LS_ANAGRAM_PAUSE_CHAT_LAST_SIG);
+            if (prevSig === signature) return;
+            localStorage.setItem(LS_ANAGRAM_PAUSE_CHAT_LAST_SIG, signature);
+        } catch {
+            /* ignore */
+        }
+
+        const pauseId = makePauseId();
+
+        // Per-card snapshot storage (true multi-slot resume).
+        try {
+            localStorage.setItem(`${LS_ANAGRAM_PAUSE}_${pauseId}`, JSON.stringify(snap));
+        } catch {
+            /* ignore */
+        }
+
+        const body = {
+            v: 1,
+            paused: true,
+            pauseId,
+            masterWord: masterWordLower,
+            sessionKey,
+            points,
+            chadPoints,
+            tauntLevel,
+            solvedCount,
+            chadSolvedCount,
+        };
+
+        await appendAssistantPausedCard("anagram", `${ANAGRAM_MSG_PREFIX}${JSON.stringify(body)}`);
     };
 
     const handleAnagramComplete = async (payload) => {
@@ -333,6 +534,7 @@ const CoachChat = () => {
         setAnagramResume(null);
         try {
             localStorage.removeItem(LS_ANAGRAM_PAUSE);
+            localStorage.removeItem(LS_ANAGRAM_PAUSE_CHAT_LAST_SIG);
         } catch {
             /* ignore */
         }
@@ -422,6 +624,7 @@ const CoachChat = () => {
                     initialSnapshot={chessBoot}
                     onPause={handleChessPause}
                     onFinished={handleChessFinished}
+                    onNewGame={clearChessPauseChatSig}
                     onClose={() => {
                         setChessOpen(false);
                         setChessBoot(null);
@@ -430,7 +633,7 @@ const CoachChat = () => {
             ) : null}
 
             <div style={chatWrap}>
-                {messages.map((m, i) => {
+                {messagesForRender.map((m, i) => {
                     const anagram = parseAnagramPayload(m.content);
                     const chess = parseChessPayload(m.content);
                     return (
@@ -460,6 +663,7 @@ const CoachChat = () => {
                                         resultLabel={String(chess.resultLabel || "")}
                                         difficulty={String(chess.difficulty || "")}
                                         quote={String(chess.chadQuote || "")}
+                                        onResumeClick={chess.paused ? () => resumePausedChessFromChat(chess) : undefined}
                                     />
                                 ) : anagram ? (
                                     <AnagramVictoryCard
@@ -468,6 +672,7 @@ const CoachChat = () => {
                                         youPts={Number(anagram.youPts) || 0}
                                         chadPts={Number(anagram.chadPts) || 0}
                                         quote={String(anagram.quote || "")}
+                                        onResumeClick={anagram.paused ? () => resumePausedAnagramFromChat(anagram) : undefined}
                                     />
                                 ) : m.content ? (
                                     <div>{renderWithBold(m.content)}</div>
@@ -509,12 +714,13 @@ const CoachChat = () => {
                                     onClick={() => {
                                         setAttachOpen(false);
                                         if (g.id === "anagrams") {
+                                            /* + menu = always a new round; resume only via paused card in chat. */
                                             try {
-                                                const raw = localStorage.getItem(LS_ANAGRAM_PAUSE);
-                                                setAnagramResume(raw ? JSON.parse(raw) : null);
+                                                localStorage.removeItem(LS_ANAGRAM_PAUSE_CHAT_LAST_SIG);
                                             } catch {
-                                                setAnagramResume(null);
+                                                /* ignore */
                                             }
+                                            setAnagramResume(null);
                                             setAnagramOpen(true);
                                         } else if (g.id === "chess") {
                                             if (!token) {
@@ -522,11 +728,11 @@ const CoachChat = () => {
                                                 return;
                                             }
                                             try {
-                                                const raw = localStorage.getItem(LS_CHESS_PAUSE);
-                                                setChessBoot(raw ? JSON.parse(raw) : null);
+                                                localStorage.removeItem(LS_CHESS_PAUSE_CHAT_SIG);
                                             } catch {
-                                                setChessBoot(null);
+                                                /* ignore */
                                             }
+                                            setChessBoot(null);
                                             setChessSessionKey((k) => k + 1);
                                             setChessOpen(true);
                                         } else chooseGame(g.prompt);

@@ -1,19 +1,28 @@
 /**
  * Word-game style result card (green board, 4×4 ? tiles, crown, banner) for chat.
  */
-export default function AnagramVictoryCard({ won, youPts, chadPts, quote, paused }) {
+export default function AnagramVictoryCard({ won, youPts, chadPts, quote, paused, onResumeClick }) {
     if (paused) {
+        const interactive = typeof onResumeClick === "function";
+        const shellStyle = interactive ? { ...card, ...cardClickable } : card;
+        const Inner = interactive ? "button" : "div";
+        const innerProps = interactive
+            ? { type: "button", onClick: onResumeClick, style: shellStyle }
+            : { style: shellStyle };
         return (
-            <div style={card}>
+            <Inner {...innerProps}>
                 <div style={patternBg} />
                 <div style={inner}>
                     <div style={birdBadge} aria-hidden>
                         <span style={birdEmoji}>⏸️</span>
                     </div>
                     <div style={bannerBar}>ANAGRAMS PAUSED</div>
-                    <p style={scoreLine}>Your round was saved. Open Games → Anagrams to continue.</p>
+                    <p style={scoreLine}>
+                        {interactive ? "Tap here to resume your round." : "Your round was saved."}
+                    </p>
+                    {interactive ? <p style={tapHint}>Resume</p> : null}
                 </div>
-            </div>
+            </Inner>
         );
     }
 
@@ -57,6 +66,28 @@ const card = {
     margin: "4px 0",
     boxShadow: "0 12px 32px rgba(0,0,0,0.35)",
     border: "2px solid rgba(0,0,0,0.2)",
+};
+
+const cardClickable = {
+    display: "block",
+    width: "100%",
+    cursor: "pointer",
+    textAlign: "left",
+    font: "inherit",
+    color: "inherit",
+    padding: 0,
+    border: "none",
+    WebkitTapHighlightColor: "transparent",
+};
+
+const tapHint = {
+    margin: "0 0 14px",
+    fontSize: "0.78rem",
+    fontWeight: 800,
+    letterSpacing: "0.05em",
+    color: "rgba(255,255,255,0.95)",
+    textAlign: "center",
+    textShadow: "0 1px 2px rgba(0,0,0,0.35)",
 };
 
 const patternBg = {

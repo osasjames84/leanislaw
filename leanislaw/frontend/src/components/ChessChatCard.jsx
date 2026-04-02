@@ -1,19 +1,28 @@
 /**
  * Chat bubble card for chess: finished game or paused mid-game.
  */
-export default function ChessChatCard({ paused, winner, resultLabel, difficulty, quote }) {
+export default function ChessChatCard({ paused, winner, resultLabel, difficulty, quote, onResumeClick }) {
     const diffLabel = difficulty ? String(difficulty).charAt(0).toUpperCase() + String(difficulty).slice(1) : "";
 
     if (paused) {
+        const interactive = typeof onResumeClick === "function";
+        const shellStyle = interactive ? { ...card, ...cardClickable } : card;
+        const Inner = interactive ? "button" : "div";
+        const innerProps = interactive
+            ? { type: "button", onClick: onResumeClick, style: shellStyle }
+            : { style: shellStyle };
         return (
-            <div style={card}>
+            <Inner {...innerProps}>
                 <div style={iconRow} aria-hidden>
                     <span style={emoji}>♟️</span>
                 </div>
                 <div style={title}>Chess paused</div>
-                <p style={body}>Your game vs Chad was saved. Open Games → Chess to continue.</p>
+                <p style={body}>
+                    {interactive ? "Tap here to resume your game vs Chad." : "Your game vs Chad was saved."}
+                </p>
                 {diffLabel ? <p style={meta}>Difficulty: {diffLabel}</p> : null}
-            </div>
+                {interactive ? <p style={tapHint}>Resume</p> : null}
+            </Inner>
         );
     }
 
@@ -42,6 +51,26 @@ const card = {
     background: "linear-gradient(155deg, #2a2438 0%, #1a1624 100%)",
     border: "1px solid rgba(255,255,255,0.12)",
     boxShadow: "0 10px 28px rgba(0,0,0,0.35)",
+};
+
+const cardClickable = {
+    display: "block",
+    width: "100%",
+    cursor: "pointer",
+    textAlign: "left",
+    font: "inherit",
+    color: "inherit",
+    border: "none",
+    WebkitTapHighlightColor: "transparent",
+};
+
+const tapHint = {
+    margin: "10px 0 0",
+    fontSize: "0.75rem",
+    fontWeight: 800,
+    letterSpacing: "0.04em",
+    color: "rgba(167, 139, 250, 0.95)",
+    textAlign: "center",
 };
 
 const iconRow = {

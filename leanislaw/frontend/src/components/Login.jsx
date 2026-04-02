@@ -5,6 +5,7 @@ import ChadPhoto from "../assets/creator_photo.png";
 
 const Login = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     const [searchParams] = useSearchParams();
     const coachMode = searchParams.get("coach") === "1" || searchParams.get("mode") === "coach";
     const { login } = useAuth();
