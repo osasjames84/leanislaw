@@ -49,42 +49,42 @@ h1 {
 
 @media (prefers-color-scheme: dark) {
   .cc-root:not([data-theme="light"]) {
-    --cc-page: #1a1915;
-    --cc-panel: #262521;
-    --cc-panel2: #2f2e29;
-    --cc-border: #3a3833;
-    --cc-text: #eceae3;
-    --cc-text2: #b4b2a9;
-    --cc-text3: #888780;
-    --cc-accent: #85b7eb;
-    --cc-accent-bg: #0c447c;
-    --cc-on-accent: #042c53;
-    --cc-track: #3a3833;
-    --cc-danger: #f09595;
-    --cc-danger-bg: #501313;
-    --cc-warning: #fac775;
-    --cc-warning-bg: #633806;
-    --cc-success: #5dcaa5;
-    --cc-success-bg: #085041;
+    --cc-page: #1a1a1c;
+    --cc-panel: #242427;
+    --cc-panel2: #2c2c30;
+    --cc-border: #3a3a3f;
+    --cc-text: #ededee;
+    --cc-text2: #a6a6ac;
+    --cc-text3: #78787e;
+    --cc-accent: #8fbced;
+    --cc-accent-bg: #2c507f;
+    --cc-on-accent: #08294c;
+    --cc-track: #3a3a3f;
+    --cc-danger: #f0a3a3;
+    --cc-danger-bg: #4a2222;
+    --cc-warning: #efc278;
+    --cc-warning-bg: #4a3512;
+    --cc-success: #6fd3ac;
+    --cc-success-bg: #194a3c;
   }
 }
 
 .cc-root[data-theme="dark"] {
-  --cc-page: #1a1915;
-  --cc-panel: #262521;
-  --cc-panel2: #2f2e29;
-  --cc-border: #3a3833;
-  --cc-text: #eceae3;
-  --cc-text2: #b4b2a9;
-  --cc-text3: #888780;
-  --cc-accent: #85b7eb;
-  --cc-accent-bg: #0c447c;
-  --cc-on-accent: #042c53;
-  --cc-track: #3a3833;
-  --cc-danger: #f09595;
-  --cc-danger-bg: #501313;
-  --cc-warning: #fac775;
-  --cc-warning-bg: #633806;
-  --cc-success: #5dcaa5;
-  --cc-success-bg: #085041;
+  --cc-page: #1a1a1c;
+  --cc-panel: #242427;
+  --cc-panel2: #2c2c30;
+  --cc-border: #3a3a3f;
+  --cc-text: #ededee;
+  --cc-text2: #a6a6ac;
+  --cc-text3: #78787e;
+  --cc-accent: #8fbced;
+  --cc-accent-bg: #2c507f;
+  --cc-on-accent: #08294c;
+  --cc-track: #3a3a3f;
+  --cc-danger: #f0a3a3;
+  --cc-danger-bg: #4a2222;
+  --cc-warning: #efc278;
+  --cc-warning-bg: #4a3512;
+  --cc-success: #6fd3ac;
+  --cc-success-bg: #194a3c;
 }

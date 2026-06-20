@@ -202,8 +202,6 @@ function Roster({ token }) {
     const [addOpen, setAddOpen] = useState(false);
     const [newClient, setNewClient] = useState("");
     const [query, setQuery] = useState("");
-    const [selectedId, setSelectedId] = useState(null);
-    const [preview, setPreview] = useState(null);
     const qs = week ? `?week=${encodeURIComponent(week)}` : "";
 
     const loadRoster = useCallback(async () => {
@@ -230,33 +228,6 @@ function Roster({ token }) {
         loadRoster();
         loadClients();
     }, [loadRoster, loadClients]);
-
-    // Default the inline preview to the top (needs-attention) client.
-    useEffect(() => {
-        const list = roster?.clients || [];
-        if (list.length && !list.some((c) => c.client_id === selectedId)) {
-            setSelectedId(list[0].client_id);
-        }
-    }, [roster, selectedId]);
-
-    // Fetch the selected client's full model for the inline preview panel.
-    useEffect(() => {
-        if (selectedId == null) {
-            setPreview(null);
-            return;
-        }
-        let cancelled = false;
-        (async () => {
-            try {
-                const r = await fetch(`/api/v1/reports/clients/${selectedId}/report${qs}`, {
-                    headers: authBearerHeaders(token),
-                });
-                const d = await r.json();
-                if (!cancelled && !d.error) setPreview(d);
-            } catch { /* non-fatal */ }
-        })();
-        return () => { cancelled = true; };
-    }, [selectedId, qs, token, roster]);
 
     const runReports = async () => {
         setBusy(true);
@@ -358,8 +329,8 @@ function Roster({ token }) {
                         {rows.map((c) => (
                             <tr
                                 key={c.report_id}
-                                onClick={() => setSelectedId(c.client_id)}
-                                style={{ cursor: "pointer", borderBottom: `1px solid ${BORDER}`, background: selectedId === c.client_id ? ACCENT_BG : "transparent" }}
+                                onClick={() => navigate(`/coach/clients/${c.client_id}${qs}`)}
+                                style={{ cursor: "pointer", borderBottom: `1px solid ${BORDER}` }}
                             >
                                 <td style={{ padding: "12px 16px" }}>
                                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -414,65 +385,6 @@ function Roster({ token }) {
                     </p>
                 ) : null}
             </div>
-
-            {preview?.has_report && preview.model ? (
-                <ProfilePreview
-                    model={preview.model}
-                    status={preview.status}
-                    flags={preview.flags}
-                    onOpen={() => navigate(`/coach/clients/${selectedId}${qs}`)}
-                />
-            ) : null}
-        </div>
-    );
-}
-
-function ProfilePreview({ model: m, status, flags, onOpen }) {
-    const topFlag = (flags || []).find((f) => /low|fast|no check|high stress/i.test(f));
-    const tab = (label, active) => (
-        <span
-            key={label}
-            onClick={active ? undefined : onOpen}
-            style={{ color: active ? ACCENT : TXT2, fontWeight: active ? 500 : 400, cursor: active ? "default" : "pointer" }}
-        >
-            {label}
-        </span>
-    );
-    return (
-        <div style={{ ...cardStyle, marginTop: 18 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
-                <Avatar name={m.name} status={status} />
-                <div style={{ lineHeight: 1.25, flex: 1 }}>
-                    <div style={{ fontWeight: 500 }}>{m.name}</div>
-                    <div style={{ fontSize: "0.76rem", color: TXT3 }}>{m.goal} · profile preview</div>
-                </div>
-                <button type="button" onClick={onOpen} style={{ border: "none", background: "none", color: ACCENT, fontWeight: 500, cursor: "pointer" }}>
-                    Open full profile →
-                </button>
-            </div>
-            <div style={{ display: "flex", gap: 16, fontSize: "0.84rem", borderBottom: `1px solid ${BORDER}`, paddingBottom: 9, marginBottom: 12 }}>
-                {tab("Overview", true)}
-                {["Metrics", "Nutrition", "Check-ins", "Reports"].map((t) => tab(t, false))}
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
-                <Metric label="Weight Δ" value={m.body?.trend ? `${m.body.trend.change > 0 ? "+" : ""}${m.body.trend.change} kg` : "—"} />
-                <Metric label="Sessions" value={`${m.training?.completed ?? 0} / ${m.training?.assigned ?? 0}`} />
-                <Metric label="Logged days" value={`${m.nutrition?.logged_days ?? 0} / ${m.nutrition?.target_days ?? 7}`} />
-            </div>
-            {topFlag ? <FlagBanner status={status} text={topFlag} /> : null}
-        </div>
-    );
-}
-
-function FlagBanner({ status, text }) {
-    const c =
-        status === "needs_attention"
-            ? { fg: "var(--cc-danger)", bg: "var(--cc-danger-bg)" }
-            : { fg: "var(--cc-warning)", bg: "var(--cc-warning-bg)" };
-    return (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12, padding: "10px 12px", borderRadius: 8, background: c.bg, color: c.fg, fontSize: "0.86rem" }}>
-            <i className="ti ti-alert-triangle" aria-hidden="true" style={{ fontSize: 16, flexShrink: 0 }} />
-            {text}
         </div>
     );
 }
