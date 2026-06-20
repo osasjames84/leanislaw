@@ -26,65 +26,78 @@ h1 {
   font-size: 2rem;
 }
 
-/* Coach console theme tokens (mirrors the widget's light/dark palette). */
+/* Coach console — premium dense CRM theme. Dark is the primary design. */
 .cc-root {
-  --cc-page: #f6f6f4;
+  --cc-page: #f6f7f9;
+  --cc-sidebar: #ffffff;
   --cc-panel: #ffffff;
-  --cc-panel2: #f3f3f0;
-  --cc-border: #e7e7e3;
-  --cc-text: #1d1d1b;
-  --cc-text2: #5f5e5a;
-  --cc-text3: #8a8a84;
-  --cc-accent: #185fa5;
-  --cc-accent-bg: #e6f1fb;
+  --cc-panel2: #f3f4f6;
+  --cc-border: #e4e6ea;
+  --cc-text: #1d1f24;
+  --cc-text2: #5f6470;
+  --cc-text3: #8a8f9a;
+  --cc-accent: #2f6fe0;
+  --cc-accent-bg: rgba(47, 111, 224, 0.10);
   --cc-on-accent: #ffffff;
-  --cc-track: #eceef1;
-  --cc-danger: #a32d2d;
-  --cc-danger-bg: #fceaea;
-  --cc-warning: #854f0b;
-  --cc-warning-bg: #faeeda;
-  --cc-success: #0f6e56;
-  --cc-success-bg: #e1f5ee;
+  --cc-track: #e7e9ee;
+  --cc-rowhover: rgba(0, 0, 0, 0.035);
+  --cc-success: #1a9c4a;
+  --cc-warning: #9a6b00;
+  --cc-danger: #c4453f;
+  --cc-na-bg: #fbe3e3;   --cc-na-fg: #a3302b;
+  --cc-watch-bg: #f6eccf; --cc-watch-fg: #7a5c00;
+  --cc-ot-bg: #d9f0dd;    --cc-ot-fg: #1a7a37;
+}
+
+.cc-root[data-theme="dark"],
+.cc-root[data-cc-dark="1"] {
+  --cc-page: #17181c;
+  --cc-sidebar: #1e2025;
+  --cc-panel: #22242a;
+  --cc-panel2: #1e2025;
+  --cc-border: #2e323a;
+  --cc-text: #f5f7fa;
+  --cc-text2: #9aa3b2;
+  --cc-text3: #6e7686;
+  --cc-accent: #4a8dff;
+  --cc-accent-bg: rgba(74, 141, 255, 0.16);
+  --cc-on-accent: #ffffff;
+  --cc-track: #2e323a;
+  --cc-rowhover: rgba(255, 255, 255, 0.04);
+  --cc-success: #56d364;
+  --cc-warning: #d9a441;
+  --cc-danger: #e06767;
+  --cc-na-bg: #4a1e1e;    --cc-na-fg: #ffa1a1;
+  --cc-watch-bg: #4d3c00; --cc-watch-fg: #f3c95f;
+  --cc-ot-bg: #173f17;    --cc-ot-fg: #8be28b;
 }
 
 @media (prefers-color-scheme: dark) {
   .cc-root:not([data-theme="light"]) {
-    --cc-page: #1a1a1c;
-    --cc-panel: #242427;
-    --cc-panel2: #2c2c30;
-    --cc-border: #3a3a3f;
-    --cc-text: #ededee;
-    --cc-text2: #a6a6ac;
-    --cc-text3: #78787e;
-    --cc-accent: #8fbced;
-    --cc-accent-bg: #2c507f;
-    --cc-on-accent: #08294c;
-    --cc-track: #3a3a3f;
-    --cc-danger: #f0a3a3;
-    --cc-danger-bg: #4a2222;
-    --cc-warning: #efc278;
-    --cc-warning-bg: #4a3512;
-    --cc-success: #6fd3ac;
-    --cc-success-bg: #194a3c;
+    --cc-page: #17181c;
+    --cc-sidebar: #1e2025;
+    --cc-panel: #22242a;
+    --cc-panel2: #1e2025;
+    --cc-border: #2e323a;
+    --cc-text: #f5f7fa;
+    --cc-text2: #9aa3b2;
+    --cc-text3: #6e7686;
+    --cc-accent: #4a8dff;
+    --cc-accent-bg: rgba(74, 141, 255, 0.16);
+    --cc-on-accent: #ffffff;
+    --cc-track: #2e323a;
+    --cc-rowhover: rgba(255, 255, 255, 0.04);
+    --cc-success: #56d364;
+    --cc-warning: #d9a441;
+    --cc-danger: #e06767;
+    --cc-na-bg: #4a1e1e;    --cc-na-fg: #ffa1a1;
+    --cc-watch-bg: #4d3c00; --cc-watch-fg: #f3c95f;
+    --cc-ot-bg: #173f17;    --cc-ot-fg: #8be28b;
   }
 }
 
-.cc-root[data-theme="dark"] {
-  --cc-page: #1a1a1c;
-  --cc-panel: #242427;
-  --cc-panel2: #2c2c30;
-  --cc-border: #3a3a3f;
-  --cc-text: #ededee;
-  --cc-text2: #a6a6ac;
-  --cc-text3: #78787e;
-  --cc-accent: #8fbced;
-  --cc-accent-bg: #2c507f;
-  --cc-on-accent: #08294c;
-  --cc-track: #3a3a3f;
-  --cc-danger: #f0a3a3;
-  --cc-danger-bg: #4a2222;
-  --cc-warning: #efc278;
-  --cc-warning-bg: #4a3512;
-  --cc-success: #6fd3ac;
-  --cc-success-bg: #194a3c;
-}
+.cc-root { font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+.cc-row { transition: background 0.12s ease; }
+.cc-row:hover { background: var(--cc-rowhover); }
+.cc-nav:hover { background: var(--cc-rowhover); }
+.cc-root ::placeholder { color: var(--cc-text3); }
