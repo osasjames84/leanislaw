@@ -4,22 +4,31 @@ import { useAuth } from "../contexts/AuthContext";
 import { authBearerHeaders, authJsonHeaders } from "../apiHeaders";
 
 const STATUS = {
-    needs_attention: { label: "Needs attention", color: "#e5484d", bg: "#fdecec" },
-    watch: { label: "Watch", color: "#b7791f", bg: "#fdf3e2" },
-    on_track: { label: "On track", color: "#1a7f4b", bg: "#e7f6ee" },
+    needs_attention: { label: "Needs attention", color: "#a32d2d", bg: "#fceaea" },
+    watch: { label: "Watch", color: "#854f0b", bg: "#faeeda" },
+    on_track: { label: "On track", color: "#0f6e56", bg: "#e1f5ee" },
 };
+
+const ACCENT = "#185fa5";
+const ACCENT_BG = "#e6f1fb";
+const PAGE_BG = "#f6f6f4";
+const BORDER = "#e7e7e3";
+const TXT = "#1d1d1b";
+const TXT2 = "#5f5e5a";
+const TXT3 = "#8a8a84";
+const PANEL2 = "#f3f3f0";
 
 const SHELL = {
     minHeight: "100vh",
     display: "flex",
-    background: "#f5f6f8",
+    background: PAGE_BG,
     fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", Segoe UI, sans-serif',
-    color: "#1c1c1e",
+    color: TXT,
 };
 
 function statusColor(p) {
-    if (p == null) return "#8e8e93";
-    return p >= 80 ? "#1a7f4b" : p >= 50 ? "#b7791f" : "#e5484d";
+    if (p == null) return TXT3;
+    return p >= 80 ? "#0f6e56" : p >= 50 ? "#854f0b" : "#a32d2d";
 }
 
 function initials(name = "") {
@@ -58,7 +67,7 @@ function Bar({ pct }) {
 function Pill({ status }) {
     const s = STATUS[status] || { label: status, color: "#8e8e93", bg: "#eee" };
     return (
-        <span style={{ background: s.bg, color: s.color, borderRadius: 999, padding: "3px 10px", fontSize: "0.74rem", fontWeight: 700, whiteSpace: "nowrap" }}>
+        <span style={{ background: s.bg, color: s.color, borderRadius: 999, padding: "3px 10px", fontSize: "0.74rem", fontWeight: 500, whiteSpace: "nowrap" }}>
             {s.label}
         </span>
     );
@@ -78,7 +87,7 @@ function Avatar({ name, status, size = 34 }) {
                 alignItems: "center",
                 justifyContent: "center",
                 fontSize: size < 32 ? "0.7rem" : "0.8rem",
-                fontWeight: 700,
+                fontWeight: 500,
                 flexShrink: 0,
             }}
         >
@@ -87,16 +96,16 @@ function Avatar({ name, status, size = 34 }) {
     );
 }
 
-const sidebarItem = (active) => ({
+const sidebarItem = (active, muted) => ({
     display: "flex",
     alignItems: "center",
-    gap: 10,
-    padding: "9px 14px",
-    fontSize: "0.88rem",
-    fontWeight: active ? 700 : 500,
-    color: active ? "#0a6cff" : "#3c3c43",
-    background: active ? "#eaf2ff" : "transparent",
-    borderRadius: 10,
+    gap: 11,
+    padding: "9px 12px",
+    fontSize: "0.86rem",
+    fontWeight: 500,
+    color: active ? ACCENT : muted ? TXT3 : TXT2,
+    background: active ? ACCENT_BG : "transparent",
+    borderRadius: 8,
     cursor: active ? "default" : "pointer",
     textAlign: "left",
     border: "none",
@@ -107,8 +116,11 @@ function Sidebar({ active, onOpenDashboard }) {
     const navigate = useNavigate();
     const { user, logout } = useAuth();
     const items = [
-        { key: "clients", label: "Clients", icon: "👥", onClick: () => navigate("/coach") },
-        { key: "dashboard", label: "Full dashboard", icon: "📊", onClick: onOpenDashboard },
+        { key: "clients", label: "Clients", icon: "ti-users", onClick: () => navigate("/coach") },
+        { key: "reports", label: "Reports", icon: "ti-file-text", onClick: onOpenDashboard },
+        { key: "checkins", label: "Check-ins", icon: "ti-clipboard-check", muted: true },
+        { key: "messages", label: "Messages", icon: "ti-message", muted: true },
+        { key: "settings", label: "Settings", icon: "ti-settings", muted: true },
     ];
     return (
         <aside
@@ -116,35 +128,34 @@ function Sidebar({ active, onOpenDashboard }) {
                 width: 224,
                 flexShrink: 0,
                 background: "#fff",
-                borderRight: "1px solid #e6e8ec",
+                borderRight: `1px solid ${BORDER}`,
                 padding: "calc(18px + env(safe-area-inset-top,0px)) 12px 18px",
                 display: "flex",
                 flexDirection: "column",
-                gap: 4,
+                gap: 3,
                 position: "sticky",
                 top: 0,
                 height: "100vh",
             }}
         >
-            <div style={{ padding: "4px 12px 14px", fontWeight: 800, letterSpacing: 0.3 }}>
-                LEAN IS LAW
+            <div style={{ padding: "4px 12px 16px", fontWeight: 500, fontSize: "0.95rem", letterSpacing: 0.2 }}>
+                Lean is Law
             </div>
             {items.map((it) => (
-                <button key={it.key} type="button" style={sidebarItem(active === it.key)} onClick={it.onClick}>
-                    <span aria-hidden style={{ width: 18 }}>{it.icon}</span>
+                <button
+                    key={it.key}
+                    type="button"
+                    style={sidebarItem(active === it.key, it.muted)}
+                    onClick={it.onClick || (() => {})}
+                >
+                    <i className={`ti ${it.icon}`} aria-hidden="true" style={{ fontSize: 18, width: 18 }} />
                     {it.label}
                 </button>
             ))}
-            {["Check-ins", "Messages", "Settings"].map((l) => (
-                <div key={l} style={{ ...sidebarItem(false), color: "#b0b3b8", cursor: "default" }}>
-                    <span aria-hidden style={{ width: 18 }}>•</span>
-                    {l} <span style={{ fontSize: "0.65rem", marginLeft: "auto", color: "#c4c7cc" }}>soon</span>
-                </div>
-            ))}
-            <div style={{ marginTop: "auto", borderTop: "1px solid #eceef1", paddingTop: 12, display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ marginTop: "auto", borderTop: `1px solid ${BORDER}`, paddingTop: 12, display: "flex", alignItems: "center", gap: 10 }}>
                 <Avatar name={`${user?.first_name || ""} ${user?.last_name || ""}`} size={32} />
-                <div style={{ lineHeight: 1.2, minWidth: 0 }}>
-                    <div style={{ fontSize: "0.82rem", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                <div style={{ lineHeight: 1.25, minWidth: 0 }}>
+                    <div style={{ fontSize: "0.82rem", fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                         {user?.first_name} {user?.last_name}
                     </div>
                     <button
@@ -153,7 +164,7 @@ function Sidebar({ active, onOpenDashboard }) {
                             logout();
                             navigate("/login", { replace: true });
                         }}
-                        style={{ border: "none", background: "none", color: "#ff3b30", fontSize: "0.74rem", padding: 0, cursor: "pointer" }}
+                        style={{ border: "none", background: "none", color: "#a32d2d", fontSize: "0.74rem", padding: 0, cursor: "pointer" }}
                     >
                         Log out
                     </button>
@@ -249,25 +260,29 @@ function Roster({ token }) {
     return (
         <div style={{ flex: 1, minWidth: 0, padding: "22px 26px 60px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
-                <h1 style={{ margin: 0, fontSize: "1.5rem", fontWeight: 800 }}>Clients</h1>
-                <span style={{ color: "#8e8e93", fontSize: "0.85rem" }}>
+                <h1 style={{ margin: 0, fontSize: "1.5rem", fontWeight: 500 }}>Clients</h1>
+                <span style={{ color: TXT3, fontSize: "0.85rem" }}>
                     {roster ? `Week of ${roster.week_start} → ${roster.week_end}` : "Loading…"}
                 </span>
                 <div style={{ flex: 1 }} />
-                <input
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Search clients"
-                    style={{ padding: "8px 12px", borderRadius: 10, border: "1px solid #d8dadf", fontSize: "0.85rem", width: 160 }}
-                />
+                <div style={{ display: "flex", alignItems: "center", gap: 6, border: `1px solid ${BORDER}`, borderRadius: 8, padding: "0 10px", background: "#fff" }}>
+                    <i className="ti ti-search" aria-hidden="true" style={{ fontSize: 16, color: TXT3 }} />
+                    <input
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder="Search clients"
+                        style={{ border: "none", outline: "none", padding: "8px 0", fontSize: "0.85rem", width: 140, background: "transparent" }}
+                    />
+                </div>
                 <input
                     type="date"
                     value={week}
                     onChange={(e) => setWeek(e.target.value)}
                     onBlur={loadRoster}
-                    style={{ padding: 8, borderRadius: 10, border: "1px solid #d8dadf", fontSize: "0.85rem" }}
+                    style={{ padding: 8, borderRadius: 8, border: `1px solid ${BORDER}`, fontSize: "0.85rem", background: "#fff" }}
                 />
                 <button type="button" onClick={runReports} disabled={busy} style={primaryBtn(busy)}>
+                    <i className="ti ti-refresh" aria-hidden="true" style={{ fontSize: 15, marginRight: 6, verticalAlign: "-2px" }} />
                     {busy ? "Generating…" : "Generate reports"}
                 </button>
             </div>
@@ -277,9 +292,9 @@ function Roster({ token }) {
             {s ? (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))", gap: 12, marginBottom: 18 }}>
                     {[["needs_attention", s.needs_attention], ["watch", s.watch], ["on_track", s.on_track], ["total", s.total]].map(([k, n]) => (
-                        <div key={k} style={{ ...cardStyle, padding: 14 }}>
-                            <div style={{ fontSize: "1.7rem", fontWeight: 800, color: STATUS[k]?.color || "#1c1c1e" }}>{n}</div>
-                            <div style={{ fontSize: "0.72rem", color: "#8e8e93", textTransform: "uppercase", letterSpacing: 0.4 }}>
+                        <div key={k} style={{ background: PANEL2, borderRadius: 10, padding: 14 }}>
+                            <div style={{ fontSize: "1.6rem", fontWeight: 500, color: STATUS[k]?.color || TXT }}>{n}</div>
+                            <div style={{ fontSize: "0.78rem", color: TXT2, marginTop: 2 }}>
                                 {k === "total" ? "Total clients" : STATUS[k].label}
                             </div>
                         </div>
@@ -290,9 +305,9 @@ function Roster({ token }) {
             <div style={{ ...cardStyle, padding: 0, overflowX: "auto" }}>
                 <table style={{ width: "100%", minWidth: 640, borderCollapse: "collapse", fontSize: "0.86rem" }}>
                     <thead>
-                        <tr style={{ color: "#8e8e93", textAlign: "left", background: "#fafbfc" }}>
+                        <tr style={{ color: TXT3, textAlign: "left", background: PANEL2 }}>
                             {["Client", "Status", "Training", "Nutrition", "Weight Δ", "Report"].map((h) => (
-                                <th key={h} style={{ padding: "11px 16px", fontWeight: 600, fontSize: "0.74rem", textTransform: "uppercase", letterSpacing: 0.4, borderBottom: "1px solid #eceef1" }}>{h}</th>
+                                <th key={h} style={{ padding: "10px 16px", fontWeight: 500, fontSize: "0.76rem", borderBottom: `1px solid ${BORDER}` }}>{h}</th>
                             ))}
                         </tr>
                     </thead>
@@ -307,7 +322,7 @@ function Roster({ token }) {
                                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                                         <Avatar name={c.name} status={c.status} />
                                         <div style={{ lineHeight: 1.25 }}>
-                                            <div style={{ fontWeight: 700 }}>{c.name}</div>
+                                            <div style={{ fontWeight: 500 }}>{c.name}</div>
                                             <div style={{ fontSize: "0.74rem", color: "#8e8e93" }}>{c.goal}</div>
                                         </div>
                                     </div>
@@ -323,9 +338,9 @@ function Roster({ token }) {
                                         <button
                                             type="button"
                                             onClick={(e) => { e.stopPropagation(); openBlob(`/api/v1/reports/${c.report_id}/pdf`, token, setErr); }}
-                                            style={{ border: "none", background: "none", color: "#0a6cff", fontWeight: 700, cursor: "pointer" }}
+                                            style={{ display: "inline-flex", alignItems: "center", gap: 5, border: "none", background: "none", color: ACCENT, fontWeight: 500, cursor: "pointer" }}
                                         >
-                                            PDF ↗
+                                            <i className="ti ti-download" aria-hidden="true" style={{ fontSize: 15 }} /> PDF
                                         </button>
                                     ) : <span style={{ color: "#c4c7cc" }}>—</span>}
                                 </td>
@@ -341,7 +356,7 @@ function Roster({ token }) {
             </div>
 
             <div style={{ marginTop: 16 }}>
-                <button type="button" onClick={() => setAddOpen((o) => !o)} style={{ border: "none", background: "none", color: "#0a6cff", fontWeight: 700, cursor: "pointer", padding: 0 }}>
+                <button type="button" onClick={() => setAddOpen((o) => !o)} style={{ border: "none", background: "none", color: "#185fa5", fontWeight: 500, cursor: "pointer", padding: 0 }}>
                     {addOpen ? "− Close" : "+ Add client"}
                 </button>
                 {addOpen ? (
@@ -373,8 +388,8 @@ function MiniWeight({ series }) {
     const d = pts.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)} ${y(p.weight).toFixed(1)}`).join(" ");
     return (
         <svg viewBox={`0 0 ${w} ${h}`} style={{ width: "100%", maxWidth: 380 }}>
-            <path d={d} fill="none" stroke="#0a6cff" strokeWidth="2" />
-            {pts.map((p, i) => <circle key={i} cx={x(i)} cy={y(p.weight)} r="3" fill="#0a6cff" />)}
+            <path d={d} fill="none" stroke="#185fa5" strokeWidth="2" />
+            {pts.map((p, i) => <circle key={i} cx={x(i)} cy={y(p.weight)} r="3" fill="#185fa5" />)}
             <text x={pad} y={14} fontSize="10" fill="#8e8e93">{max}kg</text>
             <text x={pad} y={h - 6} fontSize="10" fill="#8e8e93">{min}kg</text>
         </svg>
@@ -408,7 +423,7 @@ function Metric({ label, value }) {
     return (
         <div style={{ background: "#f7f8fa", borderRadius: 10, padding: "10px 12px" }}>
             <div style={{ fontSize: "0.72rem", color: "#8e8e93" }}>{label}</div>
-            <div style={{ fontSize: "1.15rem", fontWeight: 700 }}>{value}</div>
+            <div style={{ fontSize: "1.15rem", fontWeight: 500 }}>{value}</div>
         </div>
     );
 }
@@ -470,14 +485,14 @@ function Profile({ token }) {
 
     return (
         <div style={{ flex: 1, minWidth: 0, padding: "22px 26px 60px" }}>
-            <button type="button" onClick={() => navigate(`/coach${qs}`)} style={{ border: "none", background: "none", color: "#0a6cff", fontWeight: 700, cursor: "pointer", padding: 0 }}>
+            <button type="button" onClick={() => navigate(`/coach${qs}`)} style={{ border: "none", background: "none", color: "#185fa5", fontWeight: 500, cursor: "pointer", padding: 0 }}>
                 ← Clients
             </button>
 
             <div style={{ display: "flex", alignItems: "center", gap: 14, margin: "14px 0 16px" }}>
                 <Avatar name={name} status={data?.status} size={48} />
                 <div>
-                    <h1 style={{ margin: 0, fontSize: "1.5rem", fontWeight: 800 }}>{name}</h1>
+                    <h1 style={{ margin: 0, fontSize: "1.5rem", fontWeight: 500 }}>{name}</h1>
                     <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 4 }}>
                         {data?.status ? <Pill status={data.status} /> : null}
                         <span style={{ color: "#8e8e93", fontSize: "0.85rem" }}>{m?.goal} · week of {data?.week_start}</span>
@@ -505,8 +520,8 @@ function Profile({ token }) {
                             padding: "8px 12px",
                             fontSize: "0.88rem",
                             fontWeight: tab === t ? 700 : 500,
-                            color: tab === t ? "#0a6cff" : "#636366",
-                            borderBottom: tab === t ? "2px solid #0a6cff" : "2px solid transparent",
+                            color: tab === t ? "#185fa5" : "#636366",
+                            borderBottom: tab === t ? "2px solid #185fa5" : "2px solid transparent",
                             cursor: "pointer",
                         }}
                     >
@@ -621,7 +636,7 @@ function Profile({ token }) {
                                     <Pill status={h.status} />
                                     <span style={{ flex: 1, fontSize: "0.86rem" }}>Week of {h.week_start}</span>
                                     {h.has_pdf ? (
-                                        <button type="button" onClick={() => openBlob(`/api/v1/reports/${h.report_id}/pdf`, token, setErr)} style={{ border: "none", background: "none", color: "#0a6cff", fontWeight: 700, cursor: "pointer" }}>PDF ↗</button>
+                                        <button type="button" onClick={() => openBlob(`/api/v1/reports/${h.report_id}/pdf`, token, setErr)} style={{ border: "none", background: "none", color: "#185fa5", fontWeight: 500, cursor: "pointer" }}>PDF ↗</button>
                                     ) : <span style={{ color: "#c4c7cc" }}>—</span>}
                                 </div>
                             )) : <Empty text="No reports generated yet." />}
@@ -635,18 +650,18 @@ function Profile({ token }) {
 
 const cardStyle = {
     background: "#fff",
-    borderRadius: 14,
+    borderRadius: 12,
     padding: "16px 18px",
-    border: "1px solid #e6e8ec",
+    border: `1px solid ${BORDER}`,
 };
-const cardH = { margin: "0 0 12px", fontSize: "0.78rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, color: "#8e8e93" };
+const cardH = { margin: "0 0 12px", fontSize: "0.82rem", fontWeight: 500, color: TXT2 };
 const primaryBtn = (busy) => ({
     padding: "9px 16px",
-    borderRadius: 10,
+    borderRadius: 8,
     border: "none",
-    background: busy ? "#9bc4ff" : "#0a6cff",
+    background: busy ? "#9cbcd8" : ACCENT,
     color: "#fff",
-    fontWeight: 700,
+    fontWeight: 500,
     fontSize: "0.85rem",
     cursor: busy ? "default" : "pointer",
     whiteSpace: "nowrap",
