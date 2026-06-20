@@ -4,19 +4,19 @@ import { useAuth } from "../contexts/AuthContext";
 import { authBearerHeaders, authJsonHeaders } from "../apiHeaders";
 
 const STATUS = {
-    needs_attention: { label: "Needs attention", color: "#a32d2d", bg: "#fceaea" },
-    watch: { label: "Watch", color: "#854f0b", bg: "#faeeda" },
-    on_track: { label: "On track", color: "#0f6e56", bg: "#e1f5ee" },
+    needs_attention: { label: "Needs attention", color: "var(--cc-danger)", bg: "var(--cc-danger-bg)" },
+    watch: { label: "Watch", color: "var(--cc-warning)", bg: "var(--cc-warning-bg)" },
+    on_track: { label: "On track", color: "var(--cc-success)", bg: "var(--cc-success-bg)" },
 };
 
-const ACCENT = "#185fa5";
-const ACCENT_BG = "#e6f1fb";
-const PAGE_BG = "#f6f6f4";
-const BORDER = "#e7e7e3";
-const TXT = "#1d1d1b";
-const TXT2 = "#5f5e5a";
-const TXT3 = "#8a8a84";
-const PANEL2 = "#f3f3f0";
+const ACCENT = "var(--cc-accent)";
+const ACCENT_BG = "var(--cc-accent-bg)";
+const PAGE_BG = "var(--cc-page)";
+const BORDER = "var(--cc-border)";
+const TXT = "var(--cc-text)";
+const TXT2 = "var(--cc-text2)";
+const TXT3 = "var(--cc-text3)";
+const PANEL2 = "var(--cc-panel2)";
 
 const SHELL = {
     minHeight: "100vh",
@@ -28,7 +28,7 @@ const SHELL = {
 
 function statusColor(p) {
     if (p == null) return TXT3;
-    return p >= 80 ? "#0f6e56" : p >= 50 ? "#854f0b" : "#a32d2d";
+    return p >= 80 ? "var(--cc-success)" : p >= 50 ? "var(--cc-warning)" : "var(--cc-danger)";
 }
 
 function initials(name = "") {
@@ -56,16 +56,16 @@ async function openBlob(url, token, onErr) {
 function Bar({ pct }) {
     return (
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{ flex: 1, height: 6, borderRadius: 4, background: "#eceef1", overflow: "hidden", minWidth: 56 }}>
+            <div style={{ flex: 1, height: 6, borderRadius: 4, background: "var(--cc-track)", overflow: "hidden", minWidth: 56 }}>
                 <div style={{ height: "100%", width: `${Math.min(100, pct ?? 0)}%`, background: statusColor(pct) }} />
             </div>
-            <span style={{ color: "#636366", fontSize: "0.78rem", width: 32 }}>{pct ?? "—"}%</span>
+            <span style={{ color: "var(--cc-text2)", fontSize: "0.78rem", width: 32 }}>{pct ?? "—"}%</span>
         </div>
     );
 }
 
 function Pill({ status }) {
-    const s = STATUS[status] || { label: status, color: "#8e8e93", bg: "#eee" };
+    const s = STATUS[status] || { label: status, color: "var(--cc-text3)", bg: "var(--cc-panel2)" };
     return (
         <span style={{ background: s.bg, color: s.color, borderRadius: 999, padding: "3px 10px", fontSize: "0.74rem", fontWeight: 500, whiteSpace: "nowrap" }}>
             {s.label}
@@ -74,7 +74,7 @@ function Pill({ status }) {
 }
 
 function Avatar({ name, status, size = 34 }) {
-    const s = STATUS[status] || { color: "#3a6ea5", bg: "#e8eef6" };
+    const s = STATUS[status] || { color: "var(--cc-accent)", bg: "var(--cc-accent-bg)" };
     return (
         <div
             style={{
@@ -112,9 +112,16 @@ const sidebarItem = (active, muted) => ({
     width: "100%",
 });
 
-function Sidebar({ active, onOpenDashboard }) {
+const THEME_META = {
+    auto: { icon: "ti-device-desktop", label: "System theme" },
+    dark: { icon: "ti-moon", label: "Dark" },
+    light: { icon: "ti-sun", label: "Light" },
+};
+
+function Sidebar({ active, onOpenDashboard, theme, onCycleTheme }) {
     const navigate = useNavigate();
     const { user, logout } = useAuth();
+    const tm = THEME_META[theme] || THEME_META.auto;
     const items = [
         { key: "clients", label: "Clients", icon: "ti-users", onClick: () => navigate("/coach") },
         { key: "reports", label: "Reports", icon: "ti-file-text", onClick: onOpenDashboard },
@@ -127,7 +134,7 @@ function Sidebar({ active, onOpenDashboard }) {
             style={{
                 width: 224,
                 flexShrink: 0,
-                background: "#fff",
+                background: "var(--cc-panel)",
                 borderRight: `1px solid ${BORDER}`,
                 padding: "calc(18px + env(safe-area-inset-top,0px)) 12px 18px",
                 display: "flex",
@@ -152,7 +159,16 @@ function Sidebar({ active, onOpenDashboard }) {
                     {it.label}
                 </button>
             ))}
-            <div style={{ marginTop: "auto", borderTop: `1px solid ${BORDER}`, paddingTop: 12, display: "flex", alignItems: "center", gap: 10 }}>
+            <button
+                type="button"
+                onClick={onCycleTheme}
+                style={{ ...sidebarItem(false), marginTop: "auto", justifyContent: "flex-start" }}
+                aria-label={`Theme: ${tm.label}. Tap to change.`}
+            >
+                <i className={`ti ${tm.icon}`} aria-hidden="true" style={{ fontSize: 18, width: 18 }} />
+                {tm.label}
+            </button>
+            <div style={{ borderTop: `1px solid ${BORDER}`, paddingTop: 12, marginTop: 4, display: "flex", alignItems: "center", gap: 10 }}>
                 <Avatar name={`${user?.first_name || ""} ${user?.last_name || ""}`} size={32} />
                 <div style={{ lineHeight: 1.25, minWidth: 0 }}>
                     <div style={{ fontSize: "0.82rem", fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -164,7 +180,7 @@ function Sidebar({ active, onOpenDashboard }) {
                             logout();
                             navigate("/login", { replace: true });
                         }}
-                        style={{ border: "none", background: "none", color: "#a32d2d", fontSize: "0.74rem", padding: 0, cursor: "pointer" }}
+                        style={{ border: "none", background: "none", color: "var(--cc-danger)", fontSize: "0.74rem", padding: 0, cursor: "pointer" }}
                     >
                         Log out
                     </button>
@@ -260,12 +276,12 @@ function Roster({ token }) {
     return (
         <div style={{ flex: 1, minWidth: 0, padding: "22px 26px 60px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
-                <h1 style={{ margin: 0, fontSize: "1.5rem", fontWeight: 500 }}>Clients</h1>
+                <h1 style={{ margin: 0, fontSize: "1.5rem", fontWeight: 500, color: TXT }}>Clients</h1>
                 <span style={{ color: TXT3, fontSize: "0.85rem" }}>
                     {roster ? `Week of ${roster.week_start} → ${roster.week_end}` : "Loading…"}
                 </span>
                 <div style={{ flex: 1 }} />
-                <div style={{ display: "flex", alignItems: "center", gap: 6, border: `1px solid ${BORDER}`, borderRadius: 8, padding: "0 10px", background: "#fff" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, border: `1px solid ${BORDER}`, borderRadius: 8, padding: "0 10px", background: "var(--cc-panel)" }}>
                     <i className="ti ti-search" aria-hidden="true" style={{ fontSize: 16, color: TXT3 }} />
                     <input
                         value={query}
@@ -279,7 +295,7 @@ function Roster({ token }) {
                     value={week}
                     onChange={(e) => setWeek(e.target.value)}
                     onBlur={loadRoster}
-                    style={{ padding: 8, borderRadius: 8, border: `1px solid ${BORDER}`, fontSize: "0.85rem", background: "#fff" }}
+                    style={{ padding: 8, borderRadius: 8, border: `1px solid ${BORDER}`, fontSize: "0.85rem", background: "var(--cc-panel)" }}
                 />
                 <button type="button" onClick={runReports} disabled={busy} style={primaryBtn(busy)}>
                     <i className="ti ti-refresh" aria-hidden="true" style={{ fontSize: 15, marginRight: 6, verticalAlign: "-2px" }} />
@@ -287,7 +303,7 @@ function Roster({ token }) {
                 </button>
             </div>
 
-            {err ? <div style={{ ...cardStyle, marginBottom: 14, color: "#b42318" }}>{err}</div> : null}
+            {err ? <div style={{ ...cardStyle, marginBottom: 14, color: "var(--cc-danger)" }}>{err}</div> : null}
 
             {s ? (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))", gap: 12, marginBottom: 18 }}>
@@ -323,7 +339,7 @@ function Roster({ token }) {
                                         <Avatar name={c.name} status={c.status} />
                                         <div style={{ lineHeight: 1.25 }}>
                                             <div style={{ fontWeight: 500 }}>{c.name}</div>
-                                            <div style={{ fontSize: "0.74rem", color: "#8e8e93" }}>{c.goal}</div>
+                                            <div style={{ fontSize: "0.74rem", color: "var(--cc-text3)" }}>{c.goal}</div>
                                         </div>
                                     </div>
                                 </td>
@@ -342,12 +358,12 @@ function Roster({ token }) {
                                         >
                                             <i className="ti ti-download" aria-hidden="true" style={{ fontSize: 15 }} /> PDF
                                         </button>
-                                    ) : <span style={{ color: "#c4c7cc" }}>—</span>}
+                                    ) : <span style={{ color: "var(--cc-text3)" }}>—</span>}
                                 </td>
                             </tr>
                         ))}
                         {!rows.length ? (
-                            <tr><td colSpan={6} style={{ padding: 24, textAlign: "center", color: "#8e8e93" }}>
+                            <tr><td colSpan={6} style={{ padding: 24, textAlign: "center", color: "var(--cc-text3)" }}>
                                 {roster ? "No reports for this week yet — add clients, then Generate reports." : "Loading…"}
                             </td></tr>
                         ) : null}
@@ -356,7 +372,7 @@ function Roster({ token }) {
             </div>
 
             <div style={{ marginTop: 16 }}>
-                <button type="button" onClick={() => setAddOpen((o) => !o)} style={{ border: "none", background: "none", color: "#185fa5", fontWeight: 500, cursor: "pointer", padding: 0 }}>
+                <button type="button" onClick={() => setAddOpen((o) => !o)} style={{ border: "none", background: "none", color: "var(--cc-accent)", fontWeight: 500, cursor: "pointer", padding: 0 }}>
                     {addOpen ? "− Close" : "+ Add client"}
                 </button>
                 {addOpen ? (
@@ -366,7 +382,7 @@ function Roster({ token }) {
                     </div>
                 ) : null}
                 {notYet.length ? (
-                    <p style={{ fontSize: "0.78rem", color: "#8e8e93", marginTop: 8 }}>
+                    <p style={{ fontSize: "0.78rem", color: "var(--cc-text3)", marginTop: 8 }}>
                         On roster, no report yet this week: {notYet.map((c) => c.name).join(", ")}
                     </p>
                 ) : null}
@@ -388,10 +404,10 @@ function MiniWeight({ series }) {
     const d = pts.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)} ${y(p.weight).toFixed(1)}`).join(" ");
     return (
         <svg viewBox={`0 0 ${w} ${h}`} style={{ width: "100%", maxWidth: 380 }}>
-            <path d={d} fill="none" stroke="#185fa5" strokeWidth="2" />
-            {pts.map((p, i) => <circle key={i} cx={x(i)} cy={y(p.weight)} r="3" fill="#185fa5" />)}
-            <text x={pad} y={14} fontSize="10" fill="#8e8e93">{max}kg</text>
-            <text x={pad} y={h - 6} fontSize="10" fill="#8e8e93">{min}kg</text>
+            <path d={d} fill="none" strokeWidth="2" style={{ stroke: "var(--cc-accent)" }} />
+            {pts.map((p, i) => <circle key={i} cx={x(i)} cy={y(p.weight)} r="3" style={{ fill: "var(--cc-accent)" }} />)}
+            <text x={pad} y={14} fontSize="10" style={{ fill: "var(--cc-text3)" }}>{max}kg</text>
+            <text x={pad} y={h - 6} fontSize="10" style={{ fill: "var(--cc-text3)" }}>{min}kg</text>
         </svg>
     );
 }
@@ -407,22 +423,22 @@ function MiniNutrition({ days, target }) {
             {days.map((d, i) => {
                 const bh = (d.calories / max) * (h - 2 * pad);
                 const over = target && d.calories > target;
-                return <rect key={i} x={pad + i * bw + 3} y={h - pad - bh} width={bw - 6} height={bh} rx="2" fill={over ? "#e5484d" : "#1a7f4b"} />;
+                return <rect key={i} x={pad + i * bw + 3} y={h - pad - bh} width={bw - 6} height={bh} rx="2" style={{ fill: over ? "var(--cc-danger)" : "var(--cc-success)" }} />;
             })}
-            {ty != null ? <line x1={pad} y1={ty} x2={w - pad} y2={ty} stroke="#8e8e93" strokeDasharray="4 3" /> : null}
-            {ty != null ? <text x={w - pad} y={ty - 4} fontSize="10" fill="#8e8e93" textAnchor="end">target {target}</text> : null}
+            {ty != null ? <line x1={pad} y1={ty} x2={w - pad} y2={ty} strokeDasharray="4 3" style={{ stroke: "var(--cc-text3)" }} /> : null}
+            {ty != null ? <text x={w - pad} y={ty - 4} fontSize="10" textAnchor="end" style={{ fill: "var(--cc-text3)" }}>target {target}</text> : null}
         </svg>
     );
 }
 
 function Empty({ text }) {
-    return <p style={{ color: "#8e8e93", fontSize: "0.85rem", padding: "10px 0" }}>{text}</p>;
+    return <p style={{ color: "var(--cc-text3)", fontSize: "0.85rem", padding: "10px 0" }}>{text}</p>;
 }
 
 function Metric({ label, value }) {
     return (
-        <div style={{ background: "#f7f8fa", borderRadius: 10, padding: "10px 12px" }}>
-            <div style={{ fontSize: "0.72rem", color: "#8e8e93" }}>{label}</div>
+        <div style={{ background: "var(--cc-panel2)", borderRadius: 10, padding: "10px 12px" }}>
+            <div style={{ fontSize: "0.72rem", color: "var(--cc-text3)" }}>{label}</div>
             <div style={{ fontSize: "1.15rem", fontWeight: 500 }}>{value}</div>
         </div>
     );
@@ -485,17 +501,17 @@ function Profile({ token }) {
 
     return (
         <div style={{ flex: 1, minWidth: 0, padding: "22px 26px 60px" }}>
-            <button type="button" onClick={() => navigate(`/coach${qs}`)} style={{ border: "none", background: "none", color: "#185fa5", fontWeight: 500, cursor: "pointer", padding: 0 }}>
+            <button type="button" onClick={() => navigate(`/coach${qs}`)} style={{ border: "none", background: "none", color: "var(--cc-accent)", fontWeight: 500, cursor: "pointer", padding: 0 }}>
                 ← Clients
             </button>
 
             <div style={{ display: "flex", alignItems: "center", gap: 14, margin: "14px 0 16px" }}>
                 <Avatar name={name} status={data?.status} size={48} />
                 <div>
-                    <h1 style={{ margin: 0, fontSize: "1.5rem", fontWeight: 500 }}>{name}</h1>
+                    <h1 style={{ margin: 0, fontSize: "1.5rem", fontWeight: 500, color: TXT }}>{name}</h1>
                     <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 4 }}>
                         {data?.status ? <Pill status={data.status} /> : null}
-                        <span style={{ color: "#8e8e93", fontSize: "0.85rem" }}>{m?.goal} · week of {data?.week_start}</span>
+                        <span style={{ color: "var(--cc-text3)", fontSize: "0.85rem" }}>{m?.goal} · week of {data?.week_start}</span>
                     </div>
                 </div>
                 <div style={{ flex: 1 }} />
@@ -506,7 +522,7 @@ function Profile({ token }) {
                 ) : null}
             </div>
 
-            {err ? <div style={{ ...cardStyle, marginBottom: 14, color: "#b42318" }}>{err}</div> : null}
+            {err ? <div style={{ ...cardStyle, marginBottom: 14, color: "var(--cc-danger)" }}>{err}</div> : null}
 
             <div style={{ display: "flex", gap: 6, borderBottom: "1px solid #e6e8ec", marginBottom: 16, flexWrap: "wrap" }}>
                 {TABS.map((t) => (
@@ -520,7 +536,7 @@ function Profile({ token }) {
                             padding: "8px 12px",
                             fontSize: "0.88rem",
                             fontWeight: tab === t ? 700 : 500,
-                            color: tab === t ? "#185fa5" : "#636366",
+                            color: tab === t ? "var(--cc-accent)" : "var(--cc-text2)",
                             borderBottom: tab === t ? "2px solid #185fa5" : "2px solid transparent",
                             cursor: "pointer",
                         }}
@@ -532,7 +548,7 @@ function Profile({ token }) {
 
             {!data ? <Empty text="Loading…" /> : !data.has_report ? (
                 <div style={cardStyle}>
-                    <p style={{ margin: 0, color: "#636366" }}>
+                    <p style={{ margin: 0, color: "var(--cc-text2)" }}>
                         No report for this client for the week of {data.week_start}. Go to Clients and tap <strong>Generate reports</strong>.
                     </p>
                 </div>
@@ -551,10 +567,10 @@ function Profile({ token }) {
                             </div>
                             <div style={cardStyle}>
                                 <h3 style={cardH}>Coach flags</h3>
-                                <ul style={{ margin: 0, paddingLeft: 18, fontSize: "0.86rem", lineHeight: 1.6, color: "#3c3c43" }}>
+                                <ul style={{ margin: 0, paddingLeft: 18, fontSize: "0.86rem", lineHeight: 1.6, color: "var(--cc-text2)" }}>
                                     {(data.flags || []).map((f, i) => <li key={i}>{f}</li>)}
                                 </ul>
-                                {m.training?.notes ? <p style={{ fontStyle: "italic", color: "#8e8e93", fontSize: "0.82rem", marginTop: 10 }}>Training: {m.training.notes}</p> : null}
+                                {m.training?.notes ? <p style={{ fontStyle: "italic", color: "var(--cc-text3)", fontSize: "0.82rem", marginTop: 10 }}>Training: {m.training.notes}</p> : null}
                             </div>
                         </div>
                     ) : null}
@@ -564,12 +580,12 @@ function Profile({ token }) {
                             <h3 style={cardH}>Weight trend ({m.body?.unit || "kg"})</h3>
                             <MiniWeight series={m.body?.weight_series} />
                             {m.body?.trend ? (
-                                <p style={{ fontSize: "0.85rem", color: "#636366", marginTop: 8 }}>
+                                <p style={{ fontSize: "0.85rem", color: "var(--cc-text2)", marginTop: 8 }}>
                                     {m.body.trend.start} → {m.body.trend.end} {m.body.unit} ({m.body.trend.change > 0 ? "+" : ""}{m.body.trend.change}, {m.body.trend.pct_change}%)
                                 </p>
                             ) : null}
                             {m.body?.measurements?.body_fat_pct != null ? (
-                                <p style={{ fontSize: "0.85rem", color: "#636366" }}>Body fat: {m.body.measurements.body_fat_pct}%</p>
+                                <p style={{ fontSize: "0.85rem", color: "var(--cc-text2)" }}>Body fat: {m.body.measurements.body_fat_pct}%</p>
                             ) : null}
                         </div>
                     ) : null}
@@ -599,7 +615,7 @@ function Profile({ token }) {
                                         <Metric label="Steps avg" value={m.checkin.steps_avg ?? "—"} />
                                     </div>
                                 ) : <Empty text="No check-in submitted this week." />}
-                                {m.checkin?.notes ? <p style={{ fontStyle: "italic", color: "#636366", fontSize: "0.85rem", marginTop: 10 }}>“{m.checkin.notes}”</p> : null}
+                                {m.checkin?.notes ? <p style={{ fontStyle: "italic", color: "var(--cc-text2)", fontSize: "0.85rem", marginTop: 10 }}>“{m.checkin.notes}”</p> : null}
                             </div>
                             <div style={cardStyle}>
                                 <h3 style={cardH}>Duty of care</h3>
@@ -619,7 +635,7 @@ function Profile({ token }) {
                                             <span style={{ fontSize: "0.86rem" }}>Weekly training target</span>
                                             <input type="number" min={0} max={14} defaultValue={m.training?.assigned ?? 4} onBlur={(e) => saveTarget(e.target.value)} style={{ width: 56, padding: 6, borderRadius: 8, border: "1px solid #d8dadf" }} />
                                         </label>
-                                        <p style={{ fontSize: "0.74rem", color: "#8e8e93", marginTop: 8 }}>
+                                        <p style={{ fontSize: "0.74rem", color: "var(--cc-text3)", marginTop: 8 }}>
                                             Intake screen {sg.screen_completed ? "completed" : "not completed"}.
                                         </p>
                                     </>
@@ -636,8 +652,8 @@ function Profile({ token }) {
                                     <Pill status={h.status} />
                                     <span style={{ flex: 1, fontSize: "0.86rem" }}>Week of {h.week_start}</span>
                                     {h.has_pdf ? (
-                                        <button type="button" onClick={() => openBlob(`/api/v1/reports/${h.report_id}/pdf`, token, setErr)} style={{ border: "none", background: "none", color: "#185fa5", fontWeight: 500, cursor: "pointer" }}>PDF ↗</button>
-                                    ) : <span style={{ color: "#c4c7cc" }}>—</span>}
+                                        <button type="button" onClick={() => openBlob(`/api/v1/reports/${h.report_id}/pdf`, token, setErr)} style={{ border: "none", background: "none", color: "var(--cc-accent)", fontWeight: 500, cursor: "pointer" }}>PDF ↗</button>
+                                    ) : <span style={{ color: "var(--cc-text3)" }}>—</span>}
                                 </div>
                             )) : <Empty text="No reports generated yet." />}
                         </div>
@@ -649,7 +665,7 @@ function Profile({ token }) {
 }
 
 const cardStyle = {
-    background: "#fff",
+    background: "var(--cc-panel)",
     borderRadius: 12,
     padding: "16px 18px",
     border: `1px solid ${BORDER}`,
@@ -659,8 +675,9 @@ const primaryBtn = (busy) => ({
     padding: "9px 16px",
     borderRadius: 8,
     border: "none",
-    background: busy ? "#9cbcd8" : ACCENT,
-    color: "#fff",
+    background: ACCENT,
+    opacity: busy ? 0.6 : 1,
+    color: "var(--cc-on-accent)",
     fontWeight: 500,
     fontSize: "0.85rem",
     cursor: busy ? "default" : "pointer",
@@ -670,11 +687,16 @@ const primaryBtn = (busy) => ({
 const CoachConsole = () => {
     const { token } = useAuth();
     const { clientId } = useParams();
+    const [theme, setTheme] = useState(() => localStorage.getItem("cc_theme") || "auto");
+    useEffect(() => {
+        localStorage.setItem("cc_theme", theme);
+    }, [theme]);
+    const cycleTheme = () => setTheme((t) => (t === "auto" ? "dark" : t === "dark" ? "light" : "auto"));
     const openDashboard = () => openBlob("/api/v1/reports/dashboard", token);
 
     return (
-        <div style={SHELL}>
-            <Sidebar active="clients" onOpenDashboard={openDashboard} />
+        <div className="cc-root" style={SHELL} data-theme={theme === "auto" ? undefined : theme}>
+            <Sidebar active="clients" onOpenDashboard={openDashboard} theme={theme} onCycleTheme={cycleTheme} />
             {clientId ? <Profile token={token} /> : <Roster token={token} />}
         </div>
     );

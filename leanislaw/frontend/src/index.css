@@ -25,3 +25,66 @@ h1 {
   color: #333;
   font-size: 2rem;
 }
+
+/* Coach console theme tokens (mirrors the widget's light/dark palette). */
+.cc-root {
+  --cc-page: #f6f6f4;
+  --cc-panel: #ffffff;
+  --cc-panel2: #f3f3f0;
+  --cc-border: #e7e7e3;
+  --cc-text: #1d1d1b;
+  --cc-text2: #5f5e5a;
+  --cc-text3: #8a8a84;
+  --cc-accent: #185fa5;
+  --cc-accent-bg: #e6f1fb;
+  --cc-on-accent: #ffffff;
+  --cc-track: #eceef1;
+  --cc-danger: #a32d2d;
+  --cc-danger-bg: #fceaea;
+  --cc-warning: #854f0b;
+  --cc-warning-bg: #faeeda;
+  --cc-success: #0f6e56;
+  --cc-success-bg: #e1f5ee;
+}
+
+@media (prefers-color-scheme: dark) {
+  .cc-root:not([data-theme="light"]) {
+    --cc-page: #1a1915;
+    --cc-panel: #262521;
+    --cc-panel2: #2f2e29;
+    --cc-border: #3a3833;
+    --cc-text: #eceae3;
+    --cc-text2: #b4b2a9;
+    --cc-text3: #888780;
+    --cc-accent: #85b7eb;
+    --cc-accent-bg: #0c447c;
+    --cc-on-accent: #042c53;
+    --cc-track: #3a3833;
+    --cc-danger: #f09595;
+    --cc-danger-bg: #501313;
+    --cc-warning: #fac775;
+    --cc-warning-bg: #633806;
+    --cc-success: #5dcaa5;
+    --cc-success-bg: #085041;
+  }
+}
+
+.cc-root[data-theme="dark"] {
+  --cc-page: #1a1915;
+  --cc-panel: #262521;
+  --cc-panel2: #2f2e29;
+  --cc-border: #3a3833;
+  --cc-text: #eceae3;
+  --cc-text2: #b4b2a9;
+  --cc-text3: #888780;
+  --cc-accent: #85b7eb;
+  --cc-accent-bg: #0c447c;
+  --cc-on-accent: #042c53;
+  --cc-track: #3a3833;
+  --cc-danger: #f09595;
+  --cc-danger-bg: #501313;
+  --cc-warning: #fac775;
+  --cc-warning-bg: #633806;
+  --cc-success: #5dcaa5;
+  --cc-success-bg: #085041;
+}
