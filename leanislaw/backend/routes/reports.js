@@ -9,7 +9,7 @@ import {
     weeklyDashboards,
     users,
 } from '../schema.js';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq } from 'drizzle-orm';
 import { normalizeUsername } from '../lib/username.js';
 import { resolveWeek } from '../lib/weeklyReport/weekRange.js';
 import { generateWeeklyReports } from '../lib/weeklyReport/generate.js';
@@ -212,6 +212,80 @@ router.put('/clients/:clientId/safeguarding', requireAuth, requireCoach, async (
         res.json(row);
     } catch (err) {
         console.error('PUT safeguarding:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/v1/reports/clients/:clientId/report?week= — full model for the profile.
+router.get('/clients/:clientId/report', requireAuth, requireCoach, async (req, res) => {
+    try {
+        const me = coachId(req);
+        const clientId = Number(req.params.clientId);
+        if (!(await ownsClient(me, clientId))) {
+            return res.status(404).json({ error: 'Client not on your roster.' });
+        }
+        const week = resolveWeek(req.query?.week);
+        const [row] = await db
+            .select()
+            .from(weeklyReports)
+            .where(
+                and(
+                    eq(weeklyReports.client_id, clientId),
+                    eq(weeklyReports.coach_id, me),
+                    eq(weeklyReports.week_start, week.weekStart)
+                )
+            )
+            .limit(1);
+        if (!row) {
+            return res.json({ week_start: week.weekStart, week_end: week.weekEnd, has_report: false });
+        }
+        res.json({
+            week_start: row.week_start,
+            week_end: week.weekEnd,
+            has_report: true,
+            report_id: row.id,
+            status: row.status,
+            flags: row.flags || [],
+            has_pdf: Boolean(row.pdf_base64),
+            generated_at: row.generated_at,
+            model: row.model,
+        });
+    } catch (err) {
+        console.error('GET /reports/clients/:clientId/report:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/v1/reports/clients/:clientId/reports — week history for a client.
+router.get('/clients/:clientId/reports', requireAuth, requireCoach, async (req, res) => {
+    try {
+        const me = coachId(req);
+        const clientId = Number(req.params.clientId);
+        if (!(await ownsClient(me, clientId))) {
+            return res.status(404).json({ error: 'Client not on your roster.' });
+        }
+        const rows = await db
+            .select({
+                id: weeklyReports.id,
+                week_start: weeklyReports.week_start,
+                status: weeklyReports.status,
+                pdf_base64: weeklyReports.pdf_base64,
+                generated_at: weeklyReports.generated_at,
+            })
+            .from(weeklyReports)
+            .where(and(eq(weeklyReports.client_id, clientId), eq(weeklyReports.coach_id, me)))
+            .orderBy(desc(weeklyReports.week_start));
+        res.json(
+            rows.map((r) => ({
+                report_id: r.id,
+                week_start: r.week_start,
+                status: r.status,
+                has_pdf: Boolean(r.pdf_base64),
+                generated_at: r.generated_at,
+            }))
+        );
+    } catch (err) {
+        console.error('GET /reports/clients/:clientId/reports:', err);
         res.status(500).json({ error: err.message });
     }
 });

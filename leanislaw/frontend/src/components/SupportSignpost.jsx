@@ -6,7 +6,7 @@ import { useAuth } from "../contexts/AuthContext";
  * for signed-in users. Hidden on auth/onboarding screens. Duty of care: the app
  * is coaching, not medical care.
  */
-const HIDE_ON = ["/login", "/register", "/check-email", "/verify-email", "/forgot-password", "/setup", "/support"];
+const HIDE_ON = ["/login", "/register", "/check-email", "/verify-email", "/forgot-password", "/setup", "/support", "/coach"];
 
 const SupportSignpost = () => {
     const { token } = useAuth();

@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import Dashboard from "./components/Dashboard";
 import ExerciseList from "./components/ExerciseList";
 import { useState } from "react";
@@ -26,8 +26,7 @@ import CoachChat from "./components/CoachChat";
 import ChatInbox from "./components/ChatInbox";
 import FriendDM from "./components/FriendDM";
 import CoachRoute from "./components/CoachRoute";
-import CoachDashboard from "./components/CoachDashboard";
-import CoachRoster from "./components/CoachRoster";
+import CoachConsole from "./components/CoachConsole";
 import PremiumCoaching from "./components/PremiumCoaching";
 import ProfilePage from "./components/ProfilePage";
 import MyWeek from "./components/MyWeek";
@@ -78,23 +77,24 @@ const App = () => {
               <Route path="/premium-coaching" element={<PremiumCoaching />} />
               <Route path="/me/week" element={<MyWeek />} />
               <Route path="/support" element={<SupportPage />} />
-              <Route
-                path="/coach"
-                element={
-                  <CoachRoute>
-                    <CoachDashboard />
-                  </CoachRoute>
-                }
-              />
-              <Route
-                path="/coach/reports"
-                element={
-                  <CoachRoute>
-                    <CoachRoster />
-                  </CoachRoute>
-                }
-              />
             </Route>
+            <Route
+              path="/coach"
+              element={
+                <CoachRoute>
+                  <CoachConsole />
+                </CoachRoute>
+              }
+            />
+            <Route
+              path="/coach/clients/:clientId"
+              element={
+                <CoachRoute>
+                  <CoachConsole />
+                </CoachRoute>
+              }
+            />
+            <Route path="/coach/reports" element={<Navigate to="/coach" replace />} />
             <Route
               path="/exercises"
               element={
