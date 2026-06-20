@@ -111,3 +111,63 @@ don't reinvent the thresholds."
 Weekly run options: `node-cron` inside the Express server, or a Railway/host cron
 hitting a protected `POST /api/v1/reports/run` endpoint. Recommend an idempotent
 endpoint (re-runnable per week) + host cron, with `node-cron` as a fallback.
+
+---
+
+# Implementation (Step 3) — what shipped
+
+**Decisions taken:** explicit `coach_clients` table · full Python pipeline
+(Option A) · per-client `weekly_training_target` · host-cron endpoint + opt-in
+in-process fallback.
+
+## Endpoints
+Coach (role=coach):
+- `GET  /api/v1/reports/clients` · `POST /api/v1/reports/clients` ·
+  `PATCH /api/v1/reports/clients/:clientId` · `DELETE /api/v1/reports/clients/:clientId`
+- `GET/PUT /api/v1/reports/clients/:clientId/safeguarding` (hide-raw-numbers, region)
+- `POST /api/v1/reports/run` `{ week_start? }` — build + run engine + persist
+- `GET  /api/v1/reports/roster?week=` — needs-attention-first roster + summary
+- `GET  /api/v1/reports/:id/pdf` — stored per-client PDF
+- `GET  /api/v1/reports/dashboard?week=` — engine's standalone HTML dashboard
+- `POST /api/v1/reports/cron/run-all` — header `x-cron-secret`, all coaches
+
+Client:
+- `GET  /api/v1/safeguarding/me` · `GET /api/v1/safeguarding/support`
+- `POST /api/v1/safeguarding/intake` (PAR-Q + wellbeing)
+- `POST /api/v1/safeguarding/checkin` (weekly wellbeing)
+- `GET  /api/v1/safeguarding/my-week?week=` — adherence-only, never raw numbers
+  when hide_raw_numbers is on, never coach flags.
+
+## Code map
+- `lib/weeklyReport/weekRange.js` — Mon-anchored week math
+- `lib/weeklyReport/buildBundle.js` — real DB → engine bundle (reuses macroEngine)
+- `lib/weeklyReport/runEngine.js` — spawns `reports/run_from_bundle.py`
+- `lib/weeklyReport/generate.js` — orchestrate + persist (upsert per client/week)
+- `lib/weeklyReport/schedule.js` — opt-in in-process weekly fallback
+- `lib/supportResources.js` — region signposts (UK=Beat default)
+- `routes/reports.js`, `routes/safeguarding.js`
+- Frontend: `CoachRoster`, `MyWeek`, `IntakeScreen`, `SupportPage`, `SupportSignpost`
+
+## Operations
+- Engine deps (where the backend runs): `pip install -r coaching-platform/reports/requirements.txt`
+- Env:
+  - `REPORTS_CRON_SECRET` — shared secret for the cron endpoint (required to use it)
+  - `REPORTS_INPROCESS_SCHEDULE=1` — enable the in-process fallback (default off)
+    · `REPORTS_SCHEDULE_DOW` (default 1=Mon) · `REPORTS_SCHEDULE_HOUR` (default 6)
+  - `PYTHON_BIN` (default `python3`) · `REPORTS_DIR` (override engine path)
+  - `SUPPORT_RESOURCES_JSON` — override/extend support signposts by region
+- Host cron (weekly, Monday 06:10), reports the last completed week:
+  ```
+  10 6 * * 1 curl -fsS -X POST "$APP_URL/api/v1/reports/cron/run-all" \
+    -H "x-cron-secret: $REPORTS_CRON_SECRET"
+  ```
+
+## Known scope notes / follow-ups
+- Nutrition uses the food log (`food_log_entries`); clients who track calories via
+  `daily_logs` only (no protein) won't populate macro days. Two sources exist (gap #2).
+- A "completed" training session = finished (`end_time`) or has logged sets.
+- `hide_raw_numbers` is enforced server-side on `my-week`; the client's own
+  logging screens (MacroTracking/Dashboard) carry pre-existing uncommitted edits
+  and were intentionally left untouched.
+- `schema.js` and `server.js` wiring lives in the working tree (not in the feature
+  commits) because both already carried unrelated uncommitted changes.
