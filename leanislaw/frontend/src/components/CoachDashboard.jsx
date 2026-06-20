@@ -99,6 +99,24 @@ const CoachDashboard = () => {
 
             <button
                 type="button"
+                onClick={() => navigate("/coach/reports")}
+                style={{
+                    marginTop: 16,
+                    width: "100%",
+                    padding: 14,
+                    borderRadius: 14,
+                    border: "none",
+                    background: "#007aff",
+                    color: "#fff",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                }}
+            >
+                Weekly client reports →
+            </button>
+
+            <button
+                type="button"
                 onClick={() => {
                     logout();
                     navigate("/login", { replace: true });

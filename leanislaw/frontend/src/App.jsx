@@ -27,8 +27,13 @@ import ChatInbox from "./components/ChatInbox";
 import FriendDM from "./components/FriendDM";
 import CoachRoute from "./components/CoachRoute";
 import CoachDashboard from "./components/CoachDashboard";
+import CoachRoster from "./components/CoachRoster";
 import PremiumCoaching from "./components/PremiumCoaching";
 import ProfilePage from "./components/ProfilePage";
+import MyWeek from "./components/MyWeek";
+import SupportPage from "./components/SupportPage";
+import SupportSignpost from "./components/SupportSignpost";
+import IntakeScreen from "./components/IntakeScreen";
 import { AuthProvider } from "./contexts/AuthContext";
 import { UnitsProvider } from "./contexts/UnitsContext";
 import { ActiveWorkoutProvider } from "./contexts/ActiveWorkoutContext";
@@ -71,11 +76,21 @@ const App = () => {
               <Route path="/chat/chad" element={<CoachChat />} />
               <Route path="/chat/friend/:friendId" element={<FriendDM />} />
               <Route path="/premium-coaching" element={<PremiumCoaching />} />
+              <Route path="/me/week" element={<MyWeek />} />
+              <Route path="/support" element={<SupportPage />} />
               <Route
                 path="/coach"
                 element={
                   <CoachRoute>
                     <CoachDashboard />
+                  </CoachRoute>
+                }
+              />
+              <Route
+                path="/coach/reports"
+                element={
+                  <CoachRoute>
+                    <CoachRoster />
                   </CoachRoute>
                 }
               />
@@ -112,7 +127,16 @@ const App = () => {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/setup/intake"
+              element={
+                <ProtectedRoute>
+                  <IntakeScreen />
+                </ProtectedRoute>
+              }
+            />
             </Routes>
+            <SupportSignpost />
           </ActiveWorkoutProvider>
         </UnitsProvider>
       </AuthProvider>
