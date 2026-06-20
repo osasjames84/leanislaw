@@ -26,73 +26,88 @@ h1 {
   font-size: 2rem;
 }
 
-/* Coach console — premium dense CRM theme. Dark is the primary design. */
+/* Coach console — warm charcoal premium theme. Dark is the primary design. */
 .cc-root {
-  --cc-page: #f6f7f9;
+  --cc-page: #f6f5f3;
   --cc-sidebar: #ffffff;
   --cc-panel: #ffffff;
-  --cc-panel2: #f3f4f6;
-  --cc-border: #e4e6ea;
-  --cc-text: #1d1f24;
-  --cc-text2: #5f6470;
-  --cc-text3: #8a8f9a;
-  --cc-accent: #2f6fe0;
-  --cc-accent-bg: rgba(47, 111, 224, 0.10);
+  --cc-panel2: #f4f3f1;
+  --cc-tile: #faf9f7;
+  --cc-border: #e6e4e0;
+  --cc-border-soft: rgba(0, 0, 0, 0.06);
+  --cc-text: #1d1c1a;
+  --cc-text2: #6b6964;
+  --cc-text3: #97948e;
+  --cc-accent: #4f5e7a;
+  --cc-accent-bg: rgba(79, 94, 122, 0.12);
   --cc-on-accent: #ffffff;
-  --cc-track: #e7e9ee;
-  --cc-rowhover: rgba(0, 0, 0, 0.035);
-  --cc-success: #1a9c4a;
+  --cc-track: #e7e5e1;
+  --cc-rowhover: rgba(0, 0, 0, 0.03);
+  --cc-success: #2c8a4a;
   --cc-warning: #9a6b00;
-  --cc-danger: #c4453f;
-  --cc-na-bg: #fbe3e3;   --cc-na-fg: #a3302b;
-  --cc-watch-bg: #f6eccf; --cc-watch-fg: #7a5c00;
-  --cc-ot-bg: #d9f0dd;    --cc-ot-fg: #1a7a37;
+  --cc-danger: #b8553f;
+  --cc-na-bg: #f4e2db;   --cc-na-fg: #b04a30;
+  --cc-watch-bg: #f3e8cf; --cc-watch-fg: #8a6512;
+  --cc-ot-bg: #d9eedd;    --cc-ot-fg: #2c8a4a;
+  --cc-alert-bg: rgba(184, 85, 63, 0.10);
+  --cc-alert-border: rgba(184, 85, 63, 0.30);
+  --cc-alert-fg: #b8553f;
 }
 
 .cc-root[data-theme="dark"],
 .cc-root[data-cc-dark="1"] {
-  --cc-page: #17181c;
-  --cc-sidebar: #1e2025;
-  --cc-panel: #22242a;
-  --cc-panel2: #1e2025;
-  --cc-border: #2e323a;
-  --cc-text: #f5f7fa;
-  --cc-text2: #9aa3b2;
-  --cc-text3: #6e7686;
-  --cc-accent: #4a8dff;
-  --cc-accent-bg: rgba(74, 141, 255, 0.16);
-  --cc-on-accent: #ffffff;
-  --cc-track: #2e323a;
-  --cc-rowhover: rgba(255, 255, 255, 0.04);
-  --cc-success: #56d364;
-  --cc-warning: #d9a441;
-  --cc-danger: #e06767;
-  --cc-na-bg: #4a1e1e;    --cc-na-fg: #ffa1a1;
-  --cc-watch-bg: #4d3c00; --cc-watch-fg: #f3c95f;
-  --cc-ot-bg: #173f17;    --cc-ot-fg: #8be28b;
+  --cc-page: #141312;
+  --cc-sidebar: #1f1e1c;
+  --cc-panel: #1f1e1c;
+  --cc-panel2: #1a1917;
+  --cc-tile: #242321;
+  --cc-border: #302f2c;
+  --cc-border-soft: rgba(48, 47, 44, 0.4);
+  --cc-text: #f5f5f4;
+  --cc-text2: #8a8884;
+  --cc-text3: #6e6c68;
+  --cc-accent: #4f5e7a;
+  --cc-accent-bg: rgba(79, 94, 122, 0.20);
+  --cc-on-accent: #f5f5f4;
+  --cc-track: #302f2c;
+  --cc-rowhover: rgba(255, 255, 255, 0.03);
+  --cc-success: #5fe07d;
+  --cc-warning: #e0b15f;
+  --cc-danger: #e07a5f;
+  --cc-na-bg: #3d201a;    --cc-na-fg: #e07a5f;
+  --cc-watch-bg: #382d1a; --cc-watch-fg: #e0b15f;
+  --cc-ot-bg: #1a3822;    --cc-ot-fg: #5fe07d;
+  --cc-alert-bg: rgba(56, 22, 22, 0.4);
+  --cc-alert-border: rgba(92, 36, 36, 0.6);
+  --cc-alert-fg: #e06666;
 }
 
 @media (prefers-color-scheme: dark) {
   .cc-root:not([data-theme="light"]) {
-    --cc-page: #17181c;
-    --cc-sidebar: #1e2025;
-    --cc-panel: #22242a;
-    --cc-panel2: #1e2025;
-    --cc-border: #2e323a;
-    --cc-text: #f5f7fa;
-    --cc-text2: #9aa3b2;
-    --cc-text3: #6e7686;
-    --cc-accent: #4a8dff;
-    --cc-accent-bg: rgba(74, 141, 255, 0.16);
-    --cc-on-accent: #ffffff;
-    --cc-track: #2e323a;
-    --cc-rowhover: rgba(255, 255, 255, 0.04);
-    --cc-success: #56d364;
-    --cc-warning: #d9a441;
-    --cc-danger: #e06767;
-    --cc-na-bg: #4a1e1e;    --cc-na-fg: #ffa1a1;
-    --cc-watch-bg: #4d3c00; --cc-watch-fg: #f3c95f;
-    --cc-ot-bg: #173f17;    --cc-ot-fg: #8be28b;
+    --cc-page: #141312;
+    --cc-sidebar: #1f1e1c;
+    --cc-panel: #1f1e1c;
+    --cc-panel2: #1a1917;
+    --cc-tile: #242321;
+    --cc-border: #302f2c;
+    --cc-border-soft: rgba(48, 47, 44, 0.4);
+    --cc-text: #f5f5f4;
+    --cc-text2: #8a8884;
+    --cc-text3: #6e6c68;
+    --cc-accent: #4f5e7a;
+    --cc-accent-bg: rgba(79, 94, 122, 0.20);
+    --cc-on-accent: #f5f5f4;
+    --cc-track: #302f2c;
+    --cc-rowhover: rgba(255, 255, 255, 0.03);
+    --cc-success: #5fe07d;
+    --cc-warning: #e0b15f;
+    --cc-danger: #e07a5f;
+    --cc-na-bg: #3d201a;    --cc-na-fg: #e07a5f;
+    --cc-watch-bg: #382d1a; --cc-watch-fg: #e0b15f;
+    --cc-ot-bg: #1a3822;    --cc-ot-fg: #5fe07d;
+    --cc-alert-bg: rgba(56, 22, 22, 0.4);
+    --cc-alert-border: rgba(92, 36, 36, 0.6);
+    --cc-alert-fg: #e06666;
   }
 }
 

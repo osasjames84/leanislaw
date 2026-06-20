@@ -64,16 +64,16 @@ function Bar({ pct }) {
 
 function StatCard({ label, value, color }) {
     return (
-        <div style={{ background: "var(--cc-panel2)", border: "1px solid var(--cc-border)", borderRadius: 10, padding: 12 }}>
+        <div style={{ background: "var(--cc-tile)", border: "1px solid var(--cc-border)", borderRadius: 12, padding: 16 }}>
             <div style={{ fontSize: 12, color: "var(--cc-text2)", fontWeight: 500 }}>{label}</div>
-            <div style={{ fontSize: 19, fontWeight: 700, color: color || "var(--cc-text)", marginTop: 4 }}>{value}</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: color || "var(--cc-text)", marginTop: 6, letterSpacing: -0.2 }}>{value}</div>
         </div>
     );
 }
 
 function AlertBanner({ text }) {
     return (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--cc-na-bg)", border: "1px solid var(--cc-danger)", color: "var(--cc-na-fg)", borderRadius: 10, padding: "10px 12px", fontSize: 13, fontWeight: 500 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: "var(--cc-alert-bg)", border: "1px solid var(--cc-alert-border)", color: "var(--cc-alert-fg)", borderRadius: 12, padding: "12px 16px", fontSize: 12.5, fontWeight: 500 }}>
             <i className="ti ti-alert-triangle" aria-hidden="true" style={{ fontSize: 16, flexShrink: 0 }} />
             {text}
         </div>
@@ -137,8 +137,8 @@ const navStyle = (active) => ({
     padding: "8px 10px",
     fontSize: 13.5,
     fontWeight: active ? 600 : 500,
-    color: active ? "var(--cc-accent)" : "var(--cc-text2)",
-    background: active ? "var(--cc-accent-bg)" : "transparent",
+    color: active ? "var(--cc-on-accent)" : "var(--cc-text2)",
+    background: active ? "var(--cc-accent)" : "transparent",
     borderRadius: 8,
     cursor: "pointer",
     border: "none",
@@ -230,7 +230,8 @@ function DetailsPanel({ token, clientId, weekParam, onErr }) {
         if (!d.error) setSg(d);
     };
 
-    const card = { background: "var(--cc-panel)", border: "1px solid var(--cc-border)", borderRadius: 14, padding: 16 };
+    // Inset window inside the unified card (separated by a top border).
+    const card = { background: "var(--cc-panel2)", borderTop: "1px solid var(--cc-border)", padding: 16 };
 
     if (!data) {
         return <div style={card}><Empty text="Select a client to see details." /></div>;
@@ -273,14 +274,10 @@ function DetailsPanel({ token, clientId, weekParam, onErr }) {
             </div>
 
             {tab === "Overview" ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                    {topFlag ? <AlertBanner text={topFlag} /> : null}
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
-                        <StatCard label="Weight change" value={m.body?.trend ? `${m.body.trend.change > 0 ? "+" : ""}${m.body.trend.change} kg` : "—"} color={m.body?.trend && m.body.trend.pct_change <= -1.5 ? "var(--cc-danger)" : undefined} />
-                        <StatCard label="Training sessions" value={`${m.training?.completed ?? 0} / ${m.training?.assigned ?? 0}`} />
-                        <StatCard label="Nutrition compliance" value={`${m.nutrition?.log_adherence ?? 0}%`} />
-                        <StatCard label="Logged days" value={`${m.nutrition?.logged_days ?? 0} / ${m.nutrition?.target_days ?? 7}`} />
-                    </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+                    <StatCard label="Weight change" value={m.body?.trend ? `${m.body.trend.change > 0 ? "+" : ""}${m.body.trend.change} kg` : "—"} color={m.body?.trend && m.body.trend.pct_change <= -1.5 ? "var(--cc-danger)" : undefined} />
+                    <StatCard label="Training sessions" value={`${m.training?.completed ?? 0} / ${m.training?.assigned ?? 0}`} />
+                    <StatCard label="Logged days" value={`${m.nutrition?.logged_days ?? 0} / ${m.nutrition?.target_days ?? 7}`} />
                 </div>
             ) : null}
 
@@ -356,6 +353,8 @@ function DetailsPanel({ token, clientId, weekParam, onErr }) {
                     )) : <Empty text="No reports generated yet." />}
                 </div>
             ) : null}
+
+            {topFlag ? <div style={{ marginTop: 16 }}><AlertBanner text={topFlag} /></div> : null}
         </div>
     );
 }
@@ -439,53 +438,7 @@ function Dashboard({ token, routeClientId }) {
                 </div>
             ) : null}
 
-            {/* table */}
-            <div style={{ background: "var(--cc-panel)", border: "1px solid var(--cc-border)", borderRadius: 14, overflow: "hidden", overflowX: "auto" }}>
-                <table style={{ width: "100%", minWidth: 720, borderCollapse: "collapse", fontSize: 13 }}>
-                    <thead>
-                        <tr style={{ background: "var(--cc-panel2)" }}>
-                            {["Client", "Status", "Training", "Nutrition", "Weight Δ", "Report"].map((h) => (
-                                <th key={h} style={{ textAlign: "left", padding: "10px 16px", fontSize: 11.5, fontWeight: 600, color: "var(--cc-text3)", textTransform: "uppercase", letterSpacing: 0.4, borderBottom: "1px solid var(--cc-border)" }}>{h}</th>
-                            ))}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {rows.map((c) => (
-                            <tr key={c.report_id} className="cc-row" onClick={() => navigate(`/coach/clients/${c.client_id}${qs}`)} style={{ cursor: "pointer", borderBottom: "1px solid var(--cc-border)", background: selectedId === c.client_id ? "var(--cc-accent-bg)" : "transparent" }}>
-                                <td style={{ padding: "10px 16px" }}>
-                                    <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                                        <Avatar name={c.name} status={c.status} />
-                                        <div style={{ lineHeight: 1.2 }}>
-                                            <div style={{ fontWeight: 600, color: "var(--cc-text)" }}>{c.name}</div>
-                                            <div style={{ fontSize: 11.5, color: "var(--cc-text3)" }}>{c.goal}</div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td style={{ padding: "10px 16px" }}><Pill status={c.status} small /></td>
-                                <td style={{ padding: "10px 16px" }}><Bar pct={c.training_adherence} /></td>
-                                <td style={{ padding: "10px 16px" }}><Bar pct={c.log_adherence} /></td>
-                                <td style={{ padding: "10px 16px", whiteSpace: "nowrap", color: "var(--cc-text)", fontWeight: 500 }}>
-                                    {c.weight_trend ? `${c.weight_trend.change > 0 ? "+" : ""}${c.weight_trend.change} kg` : "—"}
-                                </td>
-                                <td style={{ padding: "10px 16px" }}>
-                                    {c.has_pdf ? (
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); openBlob(`/api/v1/reports/${c.report_id}/pdf`, token, setErr); }} style={{ display: "inline-flex", alignItems: "center", gap: 5, border: "none", background: "none", color: "var(--cc-accent)", fontWeight: 600, cursor: "pointer", fontSize: 13 }}>
-                                            <i className="ti ti-download" aria-hidden="true" style={{ fontSize: 14 }} /> PDF
-                                        </button>
-                                    ) : <span style={{ color: "var(--cc-text3)" }}>—</span>}
-                                </td>
-                            </tr>
-                        ))}
-                        {!rows.length ? (
-                            <tr><td colSpan={6} style={{ padding: 20, textAlign: "center", color: "var(--cc-text3)", fontSize: 13 }}>
-                                {roster ? "No reports this week — add clients, then Generate reports." : "Loading…"}
-                            </td></tr>
-                        ) : null}
-                    </tbody>
-                </table>
-            </div>
-
-            {/* add client (compact inline) */}
+            {/* add client (compact inline, above the card) */}
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 {addOpen ? (
                     <>
@@ -500,8 +453,53 @@ function Dashboard({ token, routeClientId }) {
                 )}
             </div>
 
-            {/* client details panel — fills the space under the table */}
-            {selectedId != null ? <DetailsPanel token={token} clientId={selectedId} weekParam={week} onErr={setErr} /> : null}
+            {/* unified card: client table + inset profile preview */}
+            <div style={{ background: "var(--cc-panel)", border: "1px solid var(--cc-border)", borderRadius: 16, overflow: "hidden" }}>
+                <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", minWidth: 600, borderCollapse: "collapse", fontSize: 13 }}>
+                        <thead>
+                            <tr>
+                                {["Client", "Status", "Training", "Nutrition", "Report"].map((h) => (
+                                    <th key={h} style={{ textAlign: "left", padding: "12px 16px", fontSize: 11.5, fontWeight: 600, color: "var(--cc-text3)", textTransform: "uppercase", letterSpacing: 0.4, borderBottom: "1px solid var(--cc-border)" }}>{h}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {rows.map((c) => (
+                                <tr key={c.report_id} className="cc-row" onClick={() => navigate(`/coach/clients/${c.client_id}${qs}`)} style={{ cursor: "pointer", borderBottom: "1px solid var(--cc-border-soft)", background: selectedId === c.client_id ? "var(--cc-accent-bg)" : "transparent" }}>
+                                    <td style={{ padding: "12px 16px" }}>
+                                        <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                                            <Avatar name={c.name} status={c.status} />
+                                            <div style={{ lineHeight: 1.2 }}>
+                                                <div style={{ fontWeight: 600, color: "var(--cc-text)" }}>{c.name}</div>
+                                                <div style={{ fontSize: 11.5, color: "var(--cc-text3)" }}>{c.goal}</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td style={{ padding: "12px 16px" }}><Pill status={c.status} small /></td>
+                                    <td style={{ padding: "12px 16px" }}><Bar pct={c.training_adherence} /></td>
+                                    <td style={{ padding: "12px 16px" }}><Bar pct={c.log_adherence} /></td>
+                                    <td style={{ padding: "12px 16px" }}>
+                                        {c.has_pdf ? (
+                                            <button type="button" onClick={(e) => { e.stopPropagation(); openBlob(`/api/v1/reports/${c.report_id}/pdf`, token, setErr); }} style={{ display: "inline-flex", alignItems: "center", gap: 5, border: "none", background: "none", color: "var(--cc-accent)", fontWeight: 600, cursor: "pointer", fontSize: 13 }}>
+                                                <i className="ti ti-download" aria-hidden="true" style={{ fontSize: 14 }} /> PDF
+                                            </button>
+                                        ) : <span style={{ color: "var(--cc-text3)" }}>—</span>}
+                                    </td>
+                                </tr>
+                            ))}
+                            {!rows.length ? (
+                                <tr><td colSpan={5} style={{ padding: 20, textAlign: "center", color: "var(--cc-text3)", fontSize: 13 }}>
+                                    {roster ? "No reports this week — add clients, then Generate reports." : "Loading…"}
+                                </td></tr>
+                            ) : null}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* inset profile preview, inside the same card */}
+                {selectedId != null ? <DetailsPanel token={token} clientId={selectedId} weekParam={week} onErr={setErr} /> : null}
+            </div>
         </main>
     );
 }
