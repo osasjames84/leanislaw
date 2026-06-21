@@ -19,6 +19,20 @@ function initials(name = "") {
     return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
 }
 
+// True minus sign (U+2212) for negative numbers.
+const minusSign = (n) => `${n}`.replace("-", "−");
+const signed = (n) => `${n > 0 ? "+" : ""}${minusSign(n)}`;
+
+// Shorten the fast-drop coaching flag to "(−4.9%)" and use a true minus elsewhere.
+function displayFlag(flag, trend) {
+    if (!flag) return flag;
+    if (/fast weekly drop/i.test(flag) && trend) {
+        const pct = Math.round(trend.pct_change * 10) / 10;
+        return `Fast weekly drop (${minusSign(pct)}%) — check in before pushing the deficit`;
+    }
+    return flag.replace(/-/g, "−");
+}
+
 async function openBlob(url, token, onErr) {
     try {
         const r = await fetch(url, { headers: authBearerHeaders(token) });
@@ -142,7 +156,7 @@ const navStyle = (active) => ({
 
 function Sidebar({ active, onOpenDashboard }) {
     const navigate = useNavigate();
-    const { user, logout } = useAuth();
+    const { user } = useAuth();
     const nav = [
         { key: "clients", label: "Clients", icon: "ti-users", onClick: () => navigate("/coach") },
         { key: "reports", label: "Reports", icon: "ti-file-text", onClick: onOpenDashboard },
@@ -152,8 +166,7 @@ function Sidebar({ active, onOpenDashboard }) {
     ];
     return (
         <aside style={{ width: 248, flexShrink: 0, background: "transparent", display: "flex", flexDirection: "column", padding: 12 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "6px 8px 12px" }}>
-                <div style={{ width: 24, height: 24, borderRadius: 7, background: "var(--cc-accent-bg)", color: "var(--cc-accent)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 13 }}>L</div>
+            <div style={{ padding: "6px 8px 12px" }}>
                 <span style={{ fontWeight: 700, fontSize: 14, color: "var(--cc-text)" }}>Lean is Law</span>
             </div>
             <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -165,7 +178,7 @@ function Sidebar({ active, onOpenDashboard }) {
                 ))}
             </nav>
 
-            <div style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: 10, padding: "8px", borderTop: "1px solid var(--cc-border)", paddingTop: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px" }}>
                 <Avatar name={`${user?.first_name || ""} ${user?.last_name || ""}`} size={32} />
                 <div style={{ minWidth: 0, flex: 1, lineHeight: 1.25 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: "var(--cc-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -173,9 +186,6 @@ function Sidebar({ active, onOpenDashboard }) {
                     </div>
                     <div style={{ fontSize: 11.5, color: "var(--cc-text3)" }}>Coach</div>
                 </div>
-                <button type="button" onClick={() => { logout(); navigate("/login", { replace: true }); }} aria-label="Log out" style={{ border: "none", background: "none", color: "var(--cc-text3)", cursor: "pointer", padding: 4, fontSize: 16 }}>
-                    <i className="ti ti-logout" aria-hidden="true" />
-                </button>
             </div>
         </aside>
     );
@@ -238,18 +248,12 @@ function DetailsPanel({ token, clientId, weekParam, onErr }) {
 
     return (
         <div style={card}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
                 <Avatar name={m.name} status={data.status} size={34} />
-                <div style={{ flex: 1, minWidth: 0, lineHeight: 1.25 }}>
+                <div style={{ minWidth: 0, lineHeight: 1.25 }}>
                     <div style={{ fontWeight: 600, fontSize: 15, color: "var(--cc-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.name}</div>
-                    <div style={{ fontSize: 12, color: "var(--cc-text3)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.goal} · week of {data.week_start}</div>
+                    <div style={{ fontSize: 12, color: "var(--cc-text3)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.goal} · profile preview</div>
                 </div>
-                <Pill status={data.status} />
-                {data.has_pdf ? (
-                    <button type="button" onClick={() => openBlob(`/api/v1/reports/${data.report_id}/pdf`, token, onErr)} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "var(--cc-accent)", color: "var(--cc-on-accent)", border: "none", borderRadius: 8, padding: "7px 12px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-                        <i className="ti ti-download" aria-hidden="true" style={{ fontSize: 15 }} /> PDF
-                    </button>
-                ) : null}
             </div>
 
             <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--cc-border)", marginBottom: 14 }}>
@@ -262,8 +266,8 @@ function DetailsPanel({ token, clientId, weekParam, onErr }) {
 
             {tab === "Overview" ? (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
-                    <StatCard label="Weight change" value={m.body?.trend ? `${m.body.trend.change > 0 ? "+" : ""}${m.body.trend.change} kg` : "—"} color={m.body?.trend && m.body.trend.pct_change <= -1.5 ? "var(--cc-danger)" : undefined} />
-                    <StatCard label="Training sessions" value={`${m.training?.completed ?? 0} / ${m.training?.assigned ?? 0}`} />
+                    <StatCard label="Weight Δ" value={m.body?.trend ? `${signed(m.body.trend.change)} kg` : "—"} />
+                    <StatCard label="Sessions" value={`${m.training?.completed ?? 0} / ${m.training?.assigned ?? 0}`} />
                     <StatCard label="Logged days" value={`${m.nutrition?.logged_days ?? 0} / ${m.nutrition?.target_days ?? 7}`} />
                 </div>
             ) : null}
@@ -273,7 +277,7 @@ function DetailsPanel({ token, clientId, weekParam, onErr }) {
                     <MiniWeight series={m.body?.weight_series} />
                     {m.body?.trend ? (
                         <p style={{ fontSize: 13, color: "var(--cc-text2)", marginTop: 8 }}>
-                            {m.body.trend.start} → {m.body.trend.end} {m.body.unit} ({m.body.trend.change > 0 ? "+" : ""}{m.body.trend.change}, {m.body.trend.pct_change}%)
+                            {m.body.trend.start} → {m.body.trend.end} {m.body.unit} ({signed(m.body.trend.change)}, {minusSign(m.body.trend.pct_change)}%)
                         </p>
                     ) : null}
                 </div>
@@ -341,7 +345,7 @@ function DetailsPanel({ token, clientId, weekParam, onErr }) {
                 </div>
             ) : null}
 
-            {topFlag ? <div style={{ marginTop: 16 }}><AlertBanner text={topFlag} /></div> : null}
+            {topFlag ? <div style={{ marginTop: 16 }}><AlertBanner text={displayFlag(topFlag, m.body?.trend)} /></div> : null}
         </div>
     );
 }
