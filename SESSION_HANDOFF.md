@@ -1,3 +1,28 @@
+# ⏩ Update — 2026-06-21 (Session 4: Everfit-faithful layout dupe)
+
+Restructured the coach console to mirror Everfit's IA using `docs/everfit-reference/`
+frames 01/03/04 as the blueprint (our warm-charcoal style, not a pixel clone). Commit `ef5a31e`.
+
+- **Shell** (`CoachConsole.jsx`): far-left **icon rail** (Clients/Library/Forms/Tutorials/Metrics
+  + avatar/logout) instead of the wide sidebar.
+- **All Clients** (`CoachClients.jsx`, frame 01): filter-list panel (All/Connected/Pending/Offline/
+  Need Programming/Archived + counts + invite link) + dense table with the exact Everfit columns —
+  Name · Last Activity · Last 7d Training % · Last 30d Training % · Last 7d Tasks % · Category · Status —
+  plus header filter chips, search, Workout Analytics, Add Client.
+- **Backend** `GET /reports/clients/overview` computes those columns (last-activity across all logs,
+  training % from the assigned plan or sessions-vs-target, tasks % from habit completions) + filter counts.
+- **Profile** (`CoachClientProfile.jsx`, frames 03/04): **client-list sidebar** + Everfit tab order
+  (Overview · Training · Tasks · Metrics · Food Journal · Macros · Meal Plan · Documents · Reports · Settings).
+  Overview = 3-column dashboard (Training 7d/30d/next-week + Body Metrics Overview | AI overview +
+  Goal & Countdown + Notes + Limitations + Progress Photo | Profile card + Updates feed). Metrics =
+  2-pane (metric list + Add New/Update Results | chart grid). All browser-verified at desktop width.
+
+Note: data columns use real values where modelled and graceful placeholders ("—", "Online",
+"Connected") where Everfit has features we don't model yet (Pending/Waiting-Activation states,
+in-person category). "Last 4 weeks" range selectors are static labels for now.
+
+---
+
 # ⏩ Update — 2026-06-21 (Session 3: Everfit feature parity)
 
 Built the Everfit-style feature set on top of session 2, both sides, browser-verified,
