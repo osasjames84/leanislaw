@@ -12,6 +12,13 @@ import {
     workoutSessions,
     exerciseLog,
     exercises,
+    assignedWorkouts,
+    clientTasks,
+    taskCompletions,
+    foodLogEntries,
+    weeklyCheckins,
+    progressPhotos,
+    clientProfile,
 } from '../schema.js';
 import { and, asc, desc, eq, gte, inArray } from 'drizzle-orm';
 import { normalizeUsername } from '../lib/username.js';
@@ -105,6 +112,128 @@ router.get('/clients', requireAuth, requireCoach, async (req, res) => {
         );
     } catch (err) {
         console.error('GET /reports/clients:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/v1/reports/clients/overview — the All Clients table (Everfit-style):
+// last activity, 7d/30d training %, 7d tasks %, category, status + filter counts.
+router.get('/clients/overview', requireAuth, requireCoach, async (req, res) => {
+    try {
+        const me = coachId(req);
+        const roster = await db
+            .select({
+                client_id: coachClients.client_id,
+                weekly_training_target: coachClients.weekly_training_target,
+                link_status: coachClients.status,
+                first_name: users.first_name,
+                last_name: users.last_name,
+                username: users.username,
+            })
+            .from(coachClients)
+            .innerJoin(users, eq(users.id, coachClients.client_id))
+            .where(eq(coachClients.coach_id, me))
+            .orderBy(asc(users.first_name));
+        if (!roster.length) {
+            return res.json({ clients: [], counts: { all: 0, connected: 0, pending: 0, offline: 0, need_programming: 0, archived: 0 } });
+        }
+        const ids = roster.map((r) => r.client_id);
+        const now = new Date();
+        const d7 = new Date(now); d7.setDate(d7.getDate() - 7);
+        const d30 = new Date(now); d30.setDate(d30.getDate() - 30);
+        const s7 = d7.toISOString().slice(0, 10);
+        const s30 = d30.toISOString().slice(0, 10);
+
+        // Bulk pulls, aggregated in JS.
+        const [sessions, assigned, tasks, comps, foods, weights, checkins, photos, profiles] = await Promise.all([
+            db.select({ user_id: workoutSessions.user_id, date: workoutSessions.date, endTime: workoutSessions.endTime }).from(workoutSessions).where(and(inArray(workoutSessions.user_id, ids), gte(workoutSessions.date, d30))),
+            db.select({ client_id: assignedWorkouts.client_id, scheduled_date: assignedWorkouts.scheduled_date, status: assignedWorkouts.status }).from(assignedWorkouts).where(and(inArray(assignedWorkouts.client_id, ids), gte(assignedWorkouts.scheduled_date, s30))),
+            db.select({ client_id: clientTasks.client_id, kind: clientTasks.kind }).from(clientTasks).where(and(inArray(clientTasks.client_id, ids), eq(clientTasks.active, true))),
+            db.select({ client_id: taskCompletions.client_id, date: taskCompletions.date }).from(taskCompletions).where(and(inArray(taskCompletions.client_id, ids), gte(taskCompletions.date, s7))),
+            db.select({ user_id: foodLogEntries.user_id, date: foodLogEntries.date }).from(foodLogEntries).where(and(inArray(foodLogEntries.user_id, ids), gte(foodLogEntries.date, s30))),
+            db.select({ user_id: bodyMetrics.user_id, date: bodyMetrics.date }).from(bodyMetrics).where(and(inArray(bodyMetrics.user_id, ids), gte(bodyMetrics.date, s30))),
+            db.select({ client_id: weeklyCheckins.client_id, date: weeklyCheckins.week_start }).from(weeklyCheckins).where(and(inArray(weeklyCheckins.client_id, ids), gte(weeklyCheckins.week_start, s30))),
+            db.select({ client_id: progressPhotos.client_id, date: progressPhotos.date }).from(progressPhotos).where(and(inArray(progressPhotos.client_id, ids), gte(progressPhotos.date, s30))),
+            db.select({ client_id: clientProfile.client_id, package: clientProfile.package }).from(clientProfile).where(inArray(clientProfile.client_id, ids)),
+        ]);
+
+        const lastAct = new Map();
+        const bump = (id, dateLike) => {
+            if (!dateLike) return;
+            const t = new Date(dateLike).getTime();
+            if (!Number.isFinite(t)) return;
+            if (!lastAct.has(id) || t > lastAct.get(id)) lastAct.set(id, t);
+        };
+        for (const s of sessions) bump(s.user_id, s.endTime || s.date);
+        for (const f of foods) bump(f.user_id, f.date);
+        for (const w of weights) bump(w.user_id, w.date);
+        for (const c of checkins) bump(c.client_id, c.date);
+        for (const p of photos) bump(p.client_id, p.date);
+        for (const c of comps) bump(c.client_id, c.date);
+
+        // training adherence from assigned plan when present, else sessions vs target.
+        const planAgg = new Map(); // id -> {a7,c7,a30,c30}
+        for (const a of assigned) {
+            const e = planAgg.get(a.client_id) || { a7: 0, c7: 0, a30: 0, c30: 0 };
+            const inDate = a.scheduled_date;
+            if (inDate >= s30) { e.a30 += 1; if (a.status === 'completed') e.c30 += 1; }
+            if (inDate >= s7) { e.a7 += 1; if (a.status === 'completed') e.c7 += 1; }
+            planAgg.set(a.client_id, e);
+        }
+        const sess7 = new Map(); const sess30 = new Map();
+        for (const s of sessions) {
+            const dt = new Date(s.endTime || s.date);
+            const done = s.endTime != null;
+            if (dt >= d30) sess30.set(s.user_id, (sess30.get(s.user_id) || 0) + 1);
+            if (dt >= d7) sess7.set(s.user_id, (sess7.get(s.user_id) || 0) + 1);
+            void done;
+        }
+        const habitCount = new Map();
+        for (const t of tasks) if (t.kind === 'habit') habitCount.set(t.client_id, (habitCount.get(t.client_id) || 0) + 1);
+        const comp7 = new Map();
+        for (const c of comps) comp7.set(c.client_id, (comp7.get(c.client_id) || 0) + 1);
+        const pkgById = new Map(profiles.map((p) => [p.client_id, p.package]));
+
+        const pct = (num, den) => (den > 0 ? Math.round((num / den) * 100) : null);
+        const ONLINE_MS = 48 * 3600 * 1000;
+
+        const clients = roster.map((r) => {
+            const id = r.client_id;
+            const plan = planAgg.get(id);
+            const target = r.weekly_training_target || 0;
+            const t7 = plan && plan.a7 > 0 ? pct(plan.c7, plan.a7) : (target > 0 ? Math.min(100, pct(sess7.get(id) || 0, target)) : null);
+            const t30 = plan && plan.a30 > 0 ? pct(plan.c30, plan.a30) : (target > 0 ? Math.min(100, pct(sess30.get(id) || 0, target * 4)) : null);
+            const habits = habitCount.get(id) || 0;
+            const tasks7 = habits > 0 ? Math.min(100, pct(comp7.get(id) || 0, habits * 7)) : null;
+            const la = lastAct.get(id) || null;
+            const online = la != null && (now.getTime() - la) < ONLINE_MS;
+            const noProgram = !plan || plan.a30 === 0;
+            return {
+                client_id: id,
+                name: `${r.first_name} ${r.last_name}`.trim(),
+                username: r.username,
+                last_activity: la ? new Date(la).toISOString() : null,
+                last_7d_training: t7,
+                last_30d_training: t30,
+                last_7d_tasks: tasks7,
+                category: pkgById.get(id) || 'Online',
+                status: r.link_status === 'inactive' ? 'Archived' : 'Connected',
+                online,
+                need_programming: noProgram,
+            };
+        });
+
+        const counts = {
+            all: clients.length,
+            connected: clients.filter((c) => c.status === 'Connected').length,
+            pending: 0,
+            offline: clients.filter((c) => !c.online && c.status === 'Connected').length,
+            need_programming: clients.filter((c) => c.need_programming).length,
+            archived: clients.filter((c) => c.status === 'Archived').length,
+        };
+        res.json({ clients, counts });
+    } catch (err) {
+        console.error('GET /reports/clients/overview:', err);
         res.status(500).json({ error: err.message });
     }
 });
