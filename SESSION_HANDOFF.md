@@ -1,3 +1,40 @@
+# ⏩ Update — 2026-06-21 (Session 3: Everfit feature parity)
+
+Built the Everfit-style feature set on top of session 2, both sides, browser-verified,
+committed (`8cda1a4`). Migrations 024–026 (auto-applied). New backend routes: `clientProfile.js`,
+`tasks.js`, `clientContent.js` (all mounted in server.js).
+
+- **Tasks & habits** (`client_tasks`/`task_completions`, `/api/v1/tasks`): coach assigns
+  one-off tasks or daily habits; client checks them off; coach sees 7-day completion.
+- **Profile depth** (`client_profile`, `/api/v1/profile`): coach-owned goal + countdown,
+  coach notes, injuries/limitations, profile card (email/phone/location/package/joined).
+- **Body measurements** (`body_measurements`): multi-metric (Waist/Chest/Hips/etc.) unified
+  with weight/body-fat from `body_metrics`; client "Log a measurement", coach charts + "Add".
+- **Progress photos** (`progress_photos`, base64): client uploads from the hub; coach gallery.
+- **Activity feed** (`/profile/clients/:id/activity`): aggregates workouts, check-ins, weight,
+  photos, form completions.
+- **Meal plans** (`meal_plans`, `/content`): coach builds targets + meals; client views.
+- **Documents** (`coach_documents`): per-client or shared; coach manages, client views.
+- **Coach profile** now has the full Everfit tab set: Overview · Program · Tasks · Metrics ·
+  Nutrition · Meal plan · Photos · Documents · Check-ins · Reports · Settings.
+- **Client hub** gained: goal banner, tasks check-off, meal plan, Progress (measurements +
+  photo upload), documents.
+
+### Everfit features still NOT built (next)
+- **Program builder**: multi-week programs, a calendar/week grid, reusable workout templates
+  (we have per-workout assignment + completion, not a calendar/template library).
+- **Coach↔client in-app messaging** — deliberately skipped: the DM system lives in the user's
+  uncommitted `social.js` and is friendship-gated; wiring coach↔client there risks their WIP.
+- **Roster groups/tags + Everfit columns** (Connected/Pending/Offline/Need-programming filters,
+  last-activity, 7d/30d %) — needs a `last_activity` field on `/roster`.
+- **Coach-set macro targets flowing into the client's existing MacroTracking** — that screen is
+  the user's uncommitted WIP; left alone.
+
+Demo seed for client 21 (Marcus): goal + coach notes + injuries, Waist/Chest measurements,
+1 habit + 1 task, a "Cutting — 2050 kcal" meal plan, 1 document.
+
+---
+
 # ⏩ Update — 2026-06-21 (Session 2: full coaching product)
 
 This session turned the reporting feature into a **usable end-to-end coaching product**
