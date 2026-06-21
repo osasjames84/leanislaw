@@ -226,4 +226,35 @@ async function setMyWorkoutStatus(req, res, status) {
 router.post('/my/workouts/:id/complete', requireAuth, (req, res) => setMyWorkoutStatus(req, res, 'completed'));
 router.post('/my/workouts/:id/skip', requireAuth, (req, res) => setMyWorkoutStatus(req, res, 'skipped'));
 
+// GET /api/v1/programs/my/summary — does this client have a coach + how much is
+// outstanding. Powers the client app's coaching entry point + badge.
+router.get('/my/summary', requireAuth, async (req, res) => {
+    try {
+        const me = uid(req);
+        const [link] = await db
+            .select({ coach_id: coachClients.coach_id })
+            .from(coachClients)
+            .where(eq(coachClients.client_id, me))
+            .limit(1);
+        if (!link) return res.json({ has_coach: false, todo: 0 });
+        const [coach] = await db
+            .select({ first_name: users.first_name, last_name: users.last_name })
+            .from(users)
+            .where(eq(users.id, link.coach_id))
+            .limit(1);
+        const open = await db
+            .select({ status: assignedWorkouts.status })
+            .from(assignedWorkouts)
+            .where(and(eq(assignedWorkouts.client_id, me), eq(assignedWorkouts.status, 'assigned')));
+        res.json({
+            has_coach: true,
+            coach_name: coach ? `${coach.first_name} ${coach.last_name}`.trim() : null,
+            todo: open.length,
+        });
+    } catch (err) {
+        console.error('GET /programs/my/summary:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 export default router;
