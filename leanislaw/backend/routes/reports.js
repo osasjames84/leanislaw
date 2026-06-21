@@ -8,11 +8,16 @@ import {
     weeklyReports,
     weeklyDashboards,
     users,
+    bodyMetrics,
+    workoutSessions,
+    exerciseLog,
+    exercises,
 } from '../schema.js';
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray } from 'drizzle-orm';
 import { normalizeUsername } from '../lib/username.js';
 import { resolveWeek } from '../lib/weeklyReport/weekRange.js';
 import { generateWeeklyReports } from '../lib/weeklyReport/generate.js';
+import { computeProgression } from '../lib/weeklyReport/progression.js';
 
 const router = express.Router();
 const STATUS_ORDER = { needs_attention: 0, watch: 1, on_track: 2 };
@@ -286,6 +291,83 @@ router.get('/clients/:clientId/reports', requireAuth, requireCoach, async (req, 
         );
     } catch (err) {
         console.error('GET /reports/clients/:clientId/reports:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/v1/reports/clients/:clientId/body-metrics?weeks= — weight/body-fat history.
+router.get('/clients/:clientId/body-metrics', requireAuth, requireCoach, async (req, res) => {
+    try {
+        const me = coachId(req);
+        const clientId = Number(req.params.clientId);
+        if (!(await ownsClient(me, clientId))) {
+            return res.status(404).json({ error: 'Client not on your roster.' });
+        }
+        const weeks = Math.min(52, Math.max(2, Number(req.query.weeks) || 12));
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - weeks * 7);
+        const cutoffStr = cutoff.toISOString().slice(0, 10);
+        const rows = await db
+            .select({ date: bodyMetrics.date, weight_kg: bodyMetrics.weight_kg, body_fat_pct: bodyMetrics.body_fat_pct })
+            .from(bodyMetrics)
+            .where(and(eq(bodyMetrics.user_id, clientId), gte(bodyMetrics.date, cutoffStr)))
+            .orderBy(asc(bodyMetrics.date));
+        res.json(
+            rows.map((r) => ({
+                date: r.date,
+                weight: r.weight_kg != null ? Number(r.weight_kg) : null,
+                body_fat: r.body_fat_pct != null ? Number(r.body_fat_pct) : null,
+            }))
+        );
+    } catch (err) {
+        console.error('GET /reports/clients/:clientId/body-metrics:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/v1/reports/clients/:clientId/progression?weeks= — per-exercise week-over-week.
+router.get('/clients/:clientId/progression', requireAuth, requireCoach, async (req, res) => {
+    try {
+        const me = coachId(req);
+        const clientId = Number(req.params.clientId);
+        if (!(await ownsClient(me, clientId))) {
+            return res.status(404).json({ error: 'Client not on your roster.' });
+        }
+        const weeks = Math.min(26, Math.max(2, Number(req.query.weeks) || 8));
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - weeks * 7);
+
+        const sessions = await db
+            .select({ id: workoutSessions.id, date: workoutSessions.date })
+            .from(workoutSessions)
+            .where(and(eq(workoutSessions.user_id, clientId), gte(workoutSessions.date, cutoff)));
+        if (!sessions.length) return res.json([]);
+
+        const dateById = new Map(sessions.map((s) => [s.id, s.date]));
+        const logs = await db
+            .select({
+                workoutSessionsId: exerciseLog.workoutSessionsId,
+                sets: exerciseLog.sets,
+                reps: exerciseLog.reps,
+                weight: exerciseLog.weight,
+                exercise: exercises.name,
+                body_part: exercises.body_part,
+            })
+            .from(exerciseLog)
+            .leftJoin(exercises, eq(exerciseLog.exercise_id, exercises.id))
+            .where(inArray(exerciseLog.workoutSessionsId, [...dateById.keys()]));
+
+        const rows = logs.map((l) => ({
+            exercise: l.exercise || 'Exercise',
+            body_part: l.body_part,
+            date: dateById.get(l.workoutSessionsId),
+            sets: typeof l.sets === 'string' ? JSON.parse(l.sets) : l.sets,
+            reps: l.reps,
+            weight: l.weight,
+        }));
+        res.json(computeProgression(rows));
+    } catch (err) {
+        console.error('GET /reports/clients/:clientId/progression:', err);
         res.status(500).json({ error: err.message });
     }
 });
