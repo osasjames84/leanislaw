@@ -95,7 +95,7 @@ router.get('/exerciseName/:name', async (req, res) => {
 })
 
 router.post('/', async (req , res) =>{
-    const {name, body_part: bp} = req.body;
+    const {name, body_part: bp, instructions, video_url, equipment, level} = req.body;
     if(!name || !bp){
         return res.status(404).json({error: 'Missing Fields'});
     }
@@ -111,7 +111,12 @@ router.post('/', async (req , res) =>{
       });
     }
 
-    const newExercise = await db.insert(exercises).values({ name: displayName, body_part: bp }).returning();
+    const values = { name: displayName, body_part: bp };
+    if (instructions !== undefined) values.instructions = instructions;
+    if (video_url !== undefined) values.video_url = video_url;
+    if (equipment !== undefined) values.equipment = equipment;
+    if (level !== undefined) values.level = level;
+    const newExercise = await db.insert(exercises).values(values).returning();
 
     if(!newExercise || newExercise.length === 0){
         return res.status(500).json({ error: "Failed to insert exercise" });
@@ -124,16 +129,22 @@ router.post('/', async (req , res) =>{
 
 router.patch('/:id', async (req, res) => {
     const {id} = req.params;
-    const {name, body_part} = req.body;
-
 try{
-    const[editedExercise] = await db.update(exercises)
-    .set({name, body_part})
-    .where(eq(exercises.id ,id))
+    const patch = {};
+    for (const f of ['name', 'body_part', 'instructions', 'video_url', 'equipment', 'level']) {
+        if (req.body[f] !== undefined) patch[f] = req.body[f];
+    }
+    if (Object.keys(patch).length === 0) {
+        return res.status(400).json({ error: 'Nothing to update' });
+    }
+    const [editedExercise] = await db.update(exercises)
+    .set(patch)
+    .where(eq(exercises.id, Number(id)))
     .returning()
 
     res.status(201).json({
-        message: `Exercise ${id} edited`
+        message: `Exercise ${id} edited`,
+        exercise: editedExercise,
     })
 } catch(erorr){
     res.status(500).json({error: 'Failed to update'})

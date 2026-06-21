@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { authBearerHeaders, authJsonHeaders } from "../apiHeaders";
+import CoachExerciseLibrary from "./CoachExerciseLibrary";
 
 const STATUS = {
     needs_attention: { label: "Needs attention", bg: "var(--cc-na-bg)", fg: "var(--cc-na-fg)" },
@@ -154,15 +155,15 @@ const navStyle = (active) => ({
     textAlign: "left",
 });
 
-function Sidebar({ active, onOpenDashboard }) {
+function Sidebar({ active }) {
     const navigate = useNavigate();
     const { user } = useAuth();
     const nav = [
-        { key: "clients", label: "Clients", icon: "ti-users", onClick: () => navigate("/coach") },
-        { key: "reports", label: "Reports", icon: "ti-file-text", onClick: onOpenDashboard },
-        { key: "checkins", label: "Check-ins", icon: "ti-clipboard-check" },
-        { key: "messages", label: "Messages", icon: "ti-message" },
-        { key: "settings", label: "Settings", icon: "ti-settings" },
+        { key: "clients", label: "Clients", icon: "ti-users", to: "/coach" },
+        { key: "metrics", label: "Metrics", icon: "ti-chart-line", to: "/coach/metrics" },
+        { key: "library", label: "Exercise library", icon: "ti-barbell", to: "/coach/library" },
+        { key: "forms", label: "Forms", icon: "ti-clipboard-text", to: "/coach/forms" },
+        { key: "tutorials", label: "Tutorials", icon: "ti-school", to: "/coach/tutorials" },
     ];
     return (
         <aside style={{ width: 248, flexShrink: 0, background: "transparent", display: "flex", flexDirection: "column", padding: 12 }}>
@@ -171,7 +172,7 @@ function Sidebar({ active, onOpenDashboard }) {
             </div>
             <nav style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 {nav.map((it) => (
-                    <button key={it.key} type="button" className="cc-nav" style={navStyle(active === it.key)} onClick={it.onClick || (() => {})}>
+                    <button key={it.key} type="button" className="cc-nav" style={navStyle(active === it.key)} onClick={() => navigate(it.to)}>
                         <i className={`ti ${it.icon}`} aria-hidden="true" style={{ fontSize: 17, width: 17 }} />
                         {it.label}
                     </button>
@@ -468,16 +469,40 @@ function Dashboard({ token, routeClientId }) {
     );
 }
 
-const CoachConsole = () => {
+function SectionStub({ icon, title, desc }) {
+    return (
+        <main style={{ flex: 1, minWidth: 0, height: "100%", overflowY: "auto", padding: 12, display: "flex", flexDirection: "column", gap: 12 }}>
+            <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, letterSpacing: "-0.5px", color: "var(--cc-text)" }}>{title}</h1>
+            <div style={{ background: "var(--cc-panel)", border: "1px solid var(--cc-border)", borderRadius: 14, padding: 20, display: "flex", alignItems: "center", gap: 14 }}>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: "var(--cc-accent-bg)", color: "var(--cc-accent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>
+                    <i className={`ti ${icon}`} aria-hidden="true" />
+                </div>
+                <div>
+                    <div style={{ fontWeight: 600, fontSize: 14, color: "var(--cc-text)" }}>Coming next</div>
+                    <div style={{ fontSize: 13, color: "var(--cc-text2)", marginTop: 2, lineHeight: 1.5 }}>{desc}</div>
+                </div>
+            </div>
+        </main>
+    );
+}
+
+const SECTIONS = {
+    metrics: { icon: "ti-chart-line", title: "Metrics", desc: "Aggregate client metrics — bodyweight & body-fat trends, adherence over time, and exercise progression (bench/squat/hinge week-over-week) built from logged sets." },
+    forms: { icon: "ti-clipboard-text", title: "Forms", desc: "Build custom intake (PAR-Q) and weekly check-in questionnaires, assign them to clients, and review responses." },
+    tutorials: { icon: "ti-school", title: "Tutorials", desc: "A resource library — share technique videos, guides, and documents with your clients." },
+};
+
+const CoachConsole = ({ section = "clients" }) => {
     const { token } = useAuth();
     const { clientId } = useParams();
-    const openDashboard = () => openBlob("/api/v1/reports/dashboard", token);
 
     return (
         <div className="cc-root" data-theme="dark" style={{ minHeight: "100vh", background: "var(--cc-page)", color: "var(--cc-text)", padding: 14, boxSizing: "border-box" }}>
             <div style={{ display: "flex", height: "calc(100vh - 28px)", background: "var(--cc-surface)", border: "1px solid var(--cc-border)", borderRadius: 16, overflow: "hidden" }}>
-                <Sidebar active="clients" onOpenDashboard={openDashboard} />
-                <Dashboard token={token} routeClientId={clientId} />
+                <Sidebar active={section} />
+                {section === "clients" ? <Dashboard token={token} routeClientId={clientId} /> : null}
+                {section === "library" ? <CoachExerciseLibrary token={token} /> : null}
+                {SECTIONS[section] ? <SectionStub {...SECTIONS[section]} /> : null}
             </div>
         </div>
     );

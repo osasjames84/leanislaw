@@ -94,6 +94,10 @@ const App = () => {
                 </CoachRoute>
               }
             />
+            <Route path="/coach/library" element={<CoachRoute><CoachConsole section="library" /></CoachRoute>} />
+            <Route path="/coach/metrics" element={<CoachRoute><CoachConsole section="metrics" /></CoachRoute>} />
+            <Route path="/coach/forms" element={<CoachRoute><CoachConsole section="forms" /></CoachRoute>} />
+            <Route path="/coach/tutorials" element={<CoachRoute><CoachConsole section="tutorials" /></CoachRoute>} />
             <Route path="/coach/reports" element={<Navigate to="/coach" replace />} />
             <Route
               path="/exercises"
