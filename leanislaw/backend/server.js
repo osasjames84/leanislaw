@@ -1,6 +1,7 @@
 import express from 'express';
 import 'dotenv/config';
 import { applySqlMigrations } from './lib/applySqlMigrations.js';
+import { dbConnectionHint, resolveDatabaseUrl, verifyPgConnection } from './lib/pgConnection.js';
 import exercisesRouter from './routes/exercises.js';
 import usersRouter from './routes/users.js';
 import workoutSessionsRouter from './routes/workoutSessions.js';
@@ -14,6 +15,12 @@ import chatRouter from './routes/chat.js';
 import chessRouter from './routes/chess.js';
 import coachingRouter, { handleStripeCoachingWebhook } from './routes/coaching.js';
 import socialRouter from './routes/social.js';
+import reportsRouter from './routes/reports.js';
+import safeguardingRouter from './routes/safeguarding.js';
+import programsRouter from './routes/programs.js';
+import formsRouter from './routes/forms.js';
+import tutorialsRouter from './routes/tutorials.js';
+import { startWeeklyScheduler } from './lib/weeklyReport/schedule.js';
 
 const app = express();
 const port = Number(process.env.PORT) || 4000;
@@ -65,6 +72,11 @@ app.use('/api/v1/chat', chatRouter);
 app.use('/api/v1/chess', chessRouter);
 app.use('/api/v1/coaching', coachingRouter);
 app.use('/api/v1/social', socialRouter);
+app.use('/api/v1/reports', reportsRouter);
+app.use('/api/v1/safeguarding', safeguardingRouter);
+app.use('/api/v1/programs', programsRouter);
+app.use('/api/v1/forms', formsRouter);
+app.use('/api/v1/tutorials', tutorialsRouter);
 app.use('/api/v1/users', usersRouter);
 app.use('/api/v1/exercises', exercisesRouter);
 app.use('/api/v1/workoutSessions', workoutSessionsRouter);
@@ -76,9 +88,24 @@ function skipAutoMigrate() {
 }
 
 async function start() {
-    if (process.env.DATABASE_URL && !skipAutoMigrate()) {
+    const databaseUrl = resolveDatabaseUrl();
+    if (!databaseUrl) {
+        console.error('[db] No database URL. Set DATABASE_URL or USE_LOCAL_DB=1 with DB_* in backend/.env');
+        process.exit(1);
+    }
+    try {
+        await verifyPgConnection(databaseUrl);
+        console.log('[db] connected');
+    } catch (err) {
+        console.error('[db] connection failed:', err);
+        const hint = dbConnectionHint(err);
+        if (hint) console.error(hint);
+        process.exit(1);
+    }
+    if (!skipAutoMigrate()) {
         try {
             await applySqlMigrations({
+                databaseUrl,
                 verbose: process.env.MIGRATE_VERBOSE === '1',
             });
             console.log('[migrate] SQL migrations applied');
@@ -90,6 +117,7 @@ async function start() {
     app.listen(port, () => {
         console.log(`Server running on port ${port}`);
     });
+    startWeeklyScheduler();
 }
 
 start();

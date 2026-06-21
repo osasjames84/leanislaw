@@ -19,6 +19,7 @@ import {
     userMacroPlan,
     userTdeeState,
     weeklyCheckins,
+    assignedWorkouts,
 } from '../../schema.js';
 import { and, asc, eq, gte, inArray, lte, lt } from 'drizzle-orm';
 import { computeMacroTargets, macrosForGrams } from '../macroEngine.js';
@@ -106,13 +107,37 @@ async function trainingSection(clientId, week, assigned) {
         name: r.name,
         completed: r.endTime != null || loggedSessionIds.has(r.id),
     }));
-    const completed = sessions.filter((s) => s.completed).length;
+    const loggedCompleted = sessions.filter((s) => s.completed).length;
     const notes = rows
         .map((r) => (r.notes || '').trim())
         .filter(Boolean)
         .join(' · ');
 
-    return { assigned, completed, sessions, notes };
+    // When the coach has assigned a plan for this week, that plan is the source of
+    // truth for adherence: denominator = assigned count, numerator = those the
+    // client marked done (or that have a logged session). Otherwise fall back to
+    // the static weekly_training_target denominator.
+    const plan = await db
+        .select({ status: assignedWorkouts.status })
+        .from(assignedWorkouts)
+        .where(
+            and(
+                eq(assignedWorkouts.client_id, clientId),
+                gte(assignedWorkouts.scheduled_date, week.weekStart),
+                lte(assignedWorkouts.scheduled_date, week.weekEnd)
+            )
+        );
+    if (plan.length) {
+        const planCompleted = plan.filter((p) => p.status === 'completed').length;
+        return {
+            assigned: plan.length,
+            completed: Math.max(planCompleted, Math.min(loggedCompleted, plan.length)),
+            sessions,
+            notes,
+        };
+    }
+
+    return { assigned, completed: loggedCompleted, sessions, notes };
 }
 
 async function nutritionSection(clientId, week, targets) {

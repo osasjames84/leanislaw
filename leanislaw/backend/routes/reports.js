@@ -18,9 +18,47 @@ import { normalizeUsername } from '../lib/username.js';
 import { resolveWeek } from '../lib/weeklyReport/weekRange.js';
 import { generateWeeklyReports } from '../lib/weeklyReport/generate.js';
 import { computeProgression } from '../lib/weeklyReport/progression.js';
+import { generateAiOverview } from '../lib/weeklyReport/aiOverview.js';
 
 const router = express.Router();
 const STATUS_ORDER = { needs_attention: 0, watch: 1, on_track: 2 };
+
+/** Per-exercise week-over-week progression for a client (shared by endpoints). */
+async function loadClientProgression(clientId, weeksBack = 8) {
+    const weeks = Math.min(26, Math.max(2, Number(weeksBack) || 8));
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - weeks * 7);
+
+    const sessions = await db
+        .select({ id: workoutSessions.id, date: workoutSessions.date })
+        .from(workoutSessions)
+        .where(and(eq(workoutSessions.user_id, clientId), gte(workoutSessions.date, cutoff)));
+    if (!sessions.length) return [];
+
+    const dateById = new Map(sessions.map((s) => [s.id, s.date]));
+    const logs = await db
+        .select({
+            workoutSessionsId: exerciseLog.workoutSessionsId,
+            sets: exerciseLog.sets,
+            reps: exerciseLog.reps,
+            weight: exerciseLog.weight,
+            exercise: exercises.name,
+            body_part: exercises.body_part,
+        })
+        .from(exerciseLog)
+        .leftJoin(exercises, eq(exerciseLog.exercise_id, exercises.id))
+        .where(inArray(exerciseLog.workoutSessionsId, [...dateById.keys()]));
+
+    const rows = logs.map((l) => ({
+        exercise: l.exercise || 'Exercise',
+        body_part: l.body_part,
+        date: dateById.get(l.workoutSessionsId),
+        sets: typeof l.sets === 'string' ? JSON.parse(l.sets) : l.sets,
+        reps: l.reps,
+        weight: l.weight,
+    }));
+    return computeProgression(rows);
+}
 
 function coachId(req) {
     return Number(req.userId);
@@ -333,41 +371,42 @@ router.get('/clients/:clientId/progression', requireAuth, requireCoach, async (r
         if (!(await ownsClient(me, clientId))) {
             return res.status(404).json({ error: 'Client not on your roster.' });
         }
-        const weeks = Math.min(26, Math.max(2, Number(req.query.weeks) || 8));
-        const cutoff = new Date();
-        cutoff.setDate(cutoff.getDate() - weeks * 7);
-
-        const sessions = await db
-            .select({ id: workoutSessions.id, date: workoutSessions.date })
-            .from(workoutSessions)
-            .where(and(eq(workoutSessions.user_id, clientId), gte(workoutSessions.date, cutoff)));
-        if (!sessions.length) return res.json([]);
-
-        const dateById = new Map(sessions.map((s) => [s.id, s.date]));
-        const logs = await db
-            .select({
-                workoutSessionsId: exerciseLog.workoutSessionsId,
-                sets: exerciseLog.sets,
-                reps: exerciseLog.reps,
-                weight: exerciseLog.weight,
-                exercise: exercises.name,
-                body_part: exercises.body_part,
-            })
-            .from(exerciseLog)
-            .leftJoin(exercises, eq(exerciseLog.exercise_id, exercises.id))
-            .where(inArray(exerciseLog.workoutSessionsId, [...dateById.keys()]));
-
-        const rows = logs.map((l) => ({
-            exercise: l.exercise || 'Exercise',
-            body_part: l.body_part,
-            date: dateById.get(l.workoutSessionsId),
-            sets: typeof l.sets === 'string' ? JSON.parse(l.sets) : l.sets,
-            reps: l.reps,
-            weight: l.weight,
-        }));
-        res.json(computeProgression(rows));
+        res.json(await loadClientProgression(clientId, req.query.weeks));
     } catch (err) {
         console.error('GET /reports/clients/:clientId/progression:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/v1/reports/clients/:clientId/ai-overview?week= — hybrid AI weekly note.
+// Deterministic numbers (report model + progression) narrated by Claude.
+router.get('/clients/:clientId/ai-overview', requireAuth, requireCoach, async (req, res) => {
+    try {
+        const me = coachId(req);
+        const clientId = Number(req.params.clientId);
+        if (!(await ownsClient(me, clientId))) {
+            return res.status(404).json({ error: 'Client not on your roster.' });
+        }
+        const week = resolveWeek(req.query?.week);
+        const [row] = await db
+            .select({ model: weeklyReports.model, flags: weeklyReports.flags })
+            .from(weeklyReports)
+            .where(
+                and(
+                    eq(weeklyReports.client_id, clientId),
+                    eq(weeklyReports.coach_id, me),
+                    eq(weeklyReports.week_start, week.weekStart)
+                )
+            )
+            .limit(1);
+        if (!row) {
+            return res.json({ has_report: false, week_start: week.weekStart, week_end: week.weekEnd });
+        }
+        const progression = await loadClientProgression(clientId, 8);
+        const overview = await generateAiOverview({ model: row.model, progression, flags: row.flags || [] });
+        res.json({ has_report: true, week_start: week.weekStart, week_end: week.weekEnd, ...overview });
+    } catch (err) {
+        console.error('GET /reports/clients/:clientId/ai-overview:', err);
         res.status(500).json({ error: err.message });
     }
 });

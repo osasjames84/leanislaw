@@ -91,14 +91,21 @@ export const directMessages = pgTable('direct_messages', {
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
   content: text('content').notNull(),
+  image_mime: varchar('image_mime', { length: 64 }),
+  image_base64: text('image_base64'),
   created_at: timestamp('created_at').defaultNow(),
 });
 
-// Exercises table
+// Exercises table (+ library metadata)
 export const exercises = pgTable('exercises', {
   id: serial('id').primaryKey(),
   name: text('name').notNull(),
   body_part: body_part('body_part').notNull(),
+  instructions: text('instructions'),
+  video_url: text('video_url'),
+  equipment: varchar('equipment', { length: 60 }),
+  level: varchar('level', { length: 20 }),
+  created_at: timestamp('created_at').defaultNow(),
 });
 
 // Daily logs table
@@ -252,6 +259,150 @@ export const exerciseLog = pgTable('exercise_logs', {
   weight: numeric('weight', { precision: 5, scale: 2 }),
   createdAt: timestamp('created_at').defaultNow(),
 });
+/** Explicit coach -> client roster link (the app has no coach_id otherwise). */
+export const coachClients = pgTable(
+  'coach_clients',
+  {
+    id: serial('id').primaryKey(),
+    coach_id: integer('coach_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    client_id: integer('client_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    /** Denominator for the engine's training-adherence %. */
+    weekly_training_target: integer('weekly_training_target').notNull().default(4),
+    status: varchar('status', { length: 20 }).notNull().default('active'),
+    created_at: timestamp('created_at').defaultNow(),
+  },
+  (t) => ({
+    coachClientsUnique: unique('coach_clients_unique').on(t.coach_id, t.client_id),
+  })
+);
+
+/** Coach -> client planned workouts ("programs"). One row = one planned session. */
+export const assignedWorkouts = pgTable('assigned_workouts', {
+  id: serial('id').primaryKey(),
+  coach_id: integer('coach_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  client_id: integer('client_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  title: text('title').notNull(),
+  notes: text('notes'),
+  /** Day the workout is planned for; drives weekly grouping + adherence. */
+  scheduled_date: date('scheduled_date'),
+  /** [{ exercise_id, name, body_part, sets, reps, weight, notes }] */
+  exercises: jsonb('exercises').notNull().default([]),
+  /** assigned | completed | skipped */
+  status: varchar('status', { length: 20 }).notNull().default('assigned'),
+  completed_session_id: integer('completed_session_id').references(() => workoutSessions.id, { onDelete: 'set null' }),
+  completed_at: timestamp('completed_at'),
+  created_at: timestamp('created_at').defaultNow(),
+});
+
+/** Duty of care: per-client safeguarding + intake (PAR-Q + wellbeing). */
+export const clientSafeguarding = pgTable('client_safeguarding', {
+  client_id: integer('client_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  /** When true, client-facing views show adherence only, never raw kcal/weight. */
+  hide_raw_numbers: boolean('hide_raw_numbers').notNull().default(false),
+  par_q: jsonb('par_q'),
+  screen_completed: boolean('screen_completed').notNull().default(false),
+  wellbeing_note: text('wellbeing_note'),
+  support_region: varchar('support_region', { length: 8 }).notNull().default('UK'),
+  created_at: timestamp('created_at').defaultNow(),
+  updated_at: timestamp('updated_at').defaultNow(),
+});
+
+/** Weekly wellbeing check-in -> the report 'checkin' section. */
+export const weeklyCheckins = pgTable(
+  'weekly_checkins',
+  {
+    id: serial('id').primaryKey(),
+    client_id: integer('client_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    week_start: date('week_start').notNull(),
+    sleep_h: numeric('sleep_h', { precision: 4, scale: 1 }),
+    energy_1to5: integer('energy_1to5'),
+    stress_1to5: integer('stress_1to5'),
+    notes: text('notes'),
+    created_at: timestamp('created_at').defaultNow(),
+  },
+  (t) => ({
+    weeklyCheckinsUnique: unique('weekly_checkins_unique').on(t.client_id, t.week_start),
+  })
+);
+
+/** Persisted weekly report per client per week (PDF stored in-DB as base64). */
+export const weeklyReports = pgTable(
+  'weekly_reports',
+  {
+    id: serial('id').primaryKey(),
+    coach_id: integer('coach_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    client_id: integer('client_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    week_start: date('week_start').notNull(),
+    status: varchar('status', { length: 20 }).notNull(),
+    flags: jsonb('flags').notNull().default([]),
+    model: jsonb('model').notNull(),
+    pdf_base64: text('pdf_base64'),
+    pdf_mime: varchar('pdf_mime', { length: 64 }).notNull().default('application/pdf'),
+    generated_at: timestamp('generated_at').defaultNow(),
+  },
+  (t) => ({
+    weeklyReportsUnique: unique('weekly_reports_unique').on(t.client_id, t.week_start),
+  })
+);
+
+/** The engine's standalone HTML dashboard, one per coach per week. */
+export const weeklyDashboards = pgTable(
+  'weekly_dashboards',
+  {
+    coach_id: integer('coach_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    week_start: date('week_start').notNull(),
+    html: text('html').notNull(),
+    generated_at: timestamp('generated_at').defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.coach_id, t.week_start] })]
+);
+
+/** Coach-built forms (intake / check-in questionnaires). */
+export const coachForms = pgTable('coach_forms', {
+  id: serial('id').primaryKey(),
+  coach_id: integer('coach_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  title: text('title').notNull(),
+  description: text('description'),
+  /** [{ id, label, type:'text'|'textarea'|'number'|'scale', required }] */
+  fields: jsonb('fields').notNull().default([]),
+  created_at: timestamp('created_at').defaultNow(),
+});
+
+export const formAssignments = pgTable(
+  'form_assignments',
+  {
+    id: serial('id').primaryKey(),
+    form_id: integer('form_id').notNull().references(() => coachForms.id, { onDelete: 'cascade' }),
+    client_id: integer('client_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    status: varchar('status', { length: 20 }).notNull().default('pending'),
+    created_at: timestamp('created_at').defaultNow(),
+  },
+  (t) => ({ formAssignmentsUnique: unique('form_assignments_unique').on(t.form_id, t.client_id) })
+);
+
+export const formResponses = pgTable(
+  'form_responses',
+  {
+    id: serial('id').primaryKey(),
+    form_id: integer('form_id').notNull().references(() => coachForms.id, { onDelete: 'cascade' }),
+    client_id: integer('client_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    answers: jsonb('answers').notNull().default({}),
+    submitted_at: timestamp('submitted_at').defaultNow(),
+  },
+  (t) => ({ formResponsesUnique: unique('form_responses_unique').on(t.form_id, t.client_id) })
+);
+
+/** Coach resource library shared with clients. */
+export const coachTutorials = pgTable('coach_tutorials', {
+  id: serial('id').primaryKey(),
+  coach_id: integer('coach_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  title: text('title').notNull(),
+  description: text('description'),
+  url: text('url'),
+  category: varchar('category', { length: 60 }),
+  created_at: timestamp('created_at').defaultNow(),
+});
+
 export const usersRelations = relations(users, ({ many }) => ({
     workoutSessions: many(workoutSessions),
 }));
