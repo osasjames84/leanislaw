@@ -392,6 +392,46 @@ export const formResponses = pgTable(
   (t) => ({ formResponsesUnique: unique('form_responses_unique').on(t.form_id, t.client_id) })
 );
 
+/** Client profile depth: coach-owned goal/notes/injuries + profile-card fields. */
+export const clientProfile = pgTable('client_profile', {
+  client_id: integer('client_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  goal_text: text('goal_text'),
+  goal_date: date('goal_date'),
+  coach_notes: text('coach_notes'),
+  injuries: text('injuries'),
+  phone: varchar('phone', { length: 40 }),
+  location: varchar('location', { length: 120 }),
+  package: varchar('package', { length: 120 }),
+  updated_at: timestamp('updated_at').defaultNow(),
+});
+
+/** Body measurements beyond weight/body-fat: chest, waist, hips, arm, etc. */
+export const bodyMeasurements = pgTable(
+  'body_measurements',
+  {
+    id: serial('id').primaryKey(),
+    client_id: integer('client_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    date: date('date').notNull(),
+    metric: varchar('metric', { length: 40 }).notNull(),
+    value: numeric('value', { precision: 8, scale: 2 }).notNull(),
+    unit: varchar('unit', { length: 12 }).notNull().default('cm'),
+    created_at: timestamp('created_at').defaultNow(),
+  },
+  (t) => ({ bodyMeasurementsUnique: unique('body_measurements_unique').on(t.client_id, t.date, t.metric) })
+);
+
+/** Progress photos stored in-DB as base64. */
+export const progressPhotos = pgTable('progress_photos', {
+  id: serial('id').primaryKey(),
+  client_id: integer('client_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  date: date('date').notNull(),
+  angle: varchar('angle', { length: 20 }),
+  image_mime: varchar('image_mime', { length: 64 }),
+  image_base64: text('image_base64').notNull(),
+  note: text('note'),
+  created_at: timestamp('created_at').defaultNow(),
+});
+
 /** Coach resource library shared with clients. */
 export const coachTutorials = pgTable('coach_tutorials', {
   id: serial('id').primaryKey(),
@@ -400,6 +440,60 @@ export const coachTutorials = pgTable('coach_tutorials', {
   description: text('description'),
   url: text('url'),
   category: varchar('category', { length: 60 }),
+  created_at: timestamp('created_at').defaultNow(),
+});
+
+/** Coach -> client tasks & habits. */
+export const clientTasks = pgTable('client_tasks', {
+  id: serial('id').primaryKey(),
+  coach_id: integer('coach_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  client_id: integer('client_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  title: text('title').notNull(),
+  description: text('description'),
+  /** task | habit */
+  kind: varchar('kind', { length: 12 }).notNull().default('task'),
+  due_date: date('due_date'),
+  active: boolean('active').notNull().default(true),
+  created_at: timestamp('created_at').defaultNow(),
+});
+
+export const taskCompletions = pgTable(
+  'task_completions',
+  {
+    id: serial('id').primaryKey(),
+    task_id: integer('task_id').notNull().references(() => clientTasks.id, { onDelete: 'cascade' }),
+    client_id: integer('client_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    date: date('date').notNull(),
+    created_at: timestamp('created_at').defaultNow(),
+  },
+  (t) => ({ taskCompletionsUnique: unique('task_completions_unique').on(t.task_id, t.date) })
+);
+
+/** Coach documents (per-client when client_id set, else shared with roster). */
+export const coachDocuments = pgTable('coach_documents', {
+  id: serial('id').primaryKey(),
+  coach_id: integer('coach_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  client_id: integer('client_id').references(() => users.id, { onDelete: 'cascade' }),
+  title: text('title').notNull(),
+  url: text('url'),
+  note: text('note'),
+  created_at: timestamp('created_at').defaultNow(),
+});
+
+/** Per-client meal plan (targets + structured meals). */
+export const mealPlans = pgTable('meal_plans', {
+  id: serial('id').primaryKey(),
+  coach_id: integer('coach_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  client_id: integer('client_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  title: text('title').notNull(),
+  target_calories: integer('target_calories'),
+  target_protein_g: integer('target_protein_g'),
+  target_carbs_g: integer('target_carbs_g'),
+  target_fat_g: integer('target_fat_g'),
+  /** [{ name, items: [string], notes }] */
+  meals: jsonb('meals').notNull().default([]),
+  notes: text('notes'),
+  active: boolean('active').notNull().default(true),
   created_at: timestamp('created_at').defaultNow(),
 });
 
