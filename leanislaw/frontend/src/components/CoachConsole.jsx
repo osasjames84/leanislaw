@@ -99,25 +99,6 @@ function Empty({ text }) {
     return <p style={{ color: "var(--cc-text3)", fontSize: 13, margin: "6px 0" }}>{text}</p>;
 }
 
-function MiniWeight({ series }) {
-    const pts = (series || []).filter((p) => p.weight != null);
-    if (pts.length < 2) return <Empty text="Not enough weight data this week" />;
-    const w = 520, h = 150, pad = 28;
-    const vals = pts.map((p) => p.weight);
-    const min = Math.min(...vals), max = Math.max(...vals), rng = max - min || 1;
-    const x = (i) => pad + (i * (w - 2 * pad)) / (pts.length - 1);
-    const y = (v) => h - pad - ((v - min) / rng) * (h - 2 * pad);
-    const d = pts.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)} ${y(p.weight).toFixed(1)}`).join(" ");
-    return (
-        <svg viewBox={`0 0 ${w} ${h}`} style={{ width: "100%" }}>
-            <path d={d} fill="none" strokeWidth="2.5" style={{ stroke: "var(--cc-accent)" }} />
-            {pts.map((p, i) => <circle key={i} cx={x(i)} cy={y(p.weight)} r="3" style={{ fill: "var(--cc-accent)" }} />)}
-            <text x={pad} y={15} fontSize="11" style={{ fill: "var(--cc-text3)" }}>{max}kg</text>
-            <text x={pad} y={h - 8} fontSize="11" style={{ fill: "var(--cc-text3)" }}>{min}kg</text>
-        </svg>
-    );
-}
-
 function MiniNutrition({ days, target }) {
     if (!days || !days.length) return <Empty text="No nutrition logged this week" />;
     const w = 520, h = 150, pad = 28;
@@ -192,6 +173,65 @@ function Sidebar({ active }) {
     );
 }
 
+function MetricLine({ series, unit }) {
+    const pts = (series || []).filter((p) => p.value != null);
+    if (pts.length < 2) return <Empty text="Not enough data yet" />;
+    const w = 520, h = 130, pad = 30;
+    const vals = pts.map((p) => p.value);
+    const min = Math.min(...vals), max = Math.max(...vals), rng = max - min || 1;
+    const x = (i) => pad + (i * (w - 2 * pad)) / (pts.length - 1);
+    const y = (v) => h - pad - ((v - min) / rng) * (h - 2 * pad);
+    const d = pts.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)} ${y(p.value).toFixed(1)}`).join(" ");
+    return (
+        <svg viewBox={`0 0 ${w} ${h}`} style={{ width: "100%" }}>
+            <path d={d} fill="none" strokeWidth="2.5" style={{ stroke: "var(--cc-accent)" }} />
+            {pts.map((p, i) => <circle key={i} cx={x(i)} cy={y(p.value)} r="3" style={{ fill: "var(--cc-accent)" }} />)}
+            <text x={pad} y={14} fontSize="11" style={{ fill: "var(--cc-text3)" }}>{max}{unit}</text>
+            <text x={pad} y={h - 8} fontSize="11" style={{ fill: "var(--cc-text3)" }}>{min}{unit}</text>
+        </svg>
+    );
+}
+
+function Sparkline({ values }) {
+    const pts = (values || []).filter((v) => v != null);
+    if (pts.length < 2) return null;
+    const w = 120, h = 30;
+    const min = Math.min(...pts), max = Math.max(...pts), rng = max - min || 1;
+    const x = (i) => (i * w) / (pts.length - 1);
+    const y = (v) => h - 3 - ((v - min) / rng) * (h - 6);
+    const d = pts.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(" ");
+    return (
+        <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} style={{ flexShrink: 0 }}>
+            <path d={d} fill="none" strokeWidth="2" style={{ stroke: "var(--cc-accent)" }} />
+        </svg>
+    );
+}
+
+function ProgressionItem({ p }) {
+    const up = p.delta_1rm != null && p.delta_1rm > 0;
+    const down = p.delta_1rm != null && p.delta_1rm < 0;
+    const deltaColor = up ? "var(--cc-success)" : down ? "var(--cc-danger)" : "var(--cc-text2)";
+    return (
+        <div style={{ background: "var(--cc-tile)", border: "1px solid var(--cc-border)", borderRadius: 12, padding: 14, display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 14, color: "var(--cc-text)" }}>{p.exercise}</div>
+                    <div style={{ fontSize: 11.5, color: "var(--cc-text3)", textTransform: "capitalize" }}>{p.body_part}</div>
+                </div>
+                <Sparkline values={p.weeks.map((wk) => wk.est_1rm)} />
+            </div>
+            <div style={{ display: "flex", gap: 16, fontSize: 12.5 }}>
+                <span style={{ color: "var(--cc-text2)" }}>Top set <strong style={{ color: "var(--cc-text)" }}>{p.latest.top_weight}kg × {p.latest.top_reps}</strong></span>
+                <span style={{ color: "var(--cc-text2)" }}>est. 1RM <strong style={{ color: "var(--cc-text)" }}>{p.latest.est_1rm}kg</strong></span>
+                {p.delta_1rm != null ? <span style={{ color: deltaColor, fontWeight: 600 }}>{signed(p.delta_1rm)} vs last</span> : null}
+            </div>
+            <div style={{ fontSize: 12, color: "var(--cc-accent)", display: "flex", alignItems: "center", gap: 6 }}>
+                <i className="ti ti-bulb" aria-hidden="true" style={{ fontSize: 14 }} />{p.suggestion}
+            </div>
+        </div>
+    );
+}
+
 /* ---------------- client details panel ---------------- */
 
 const TABS = ["Overview", "Metrics", "Nutrition", "Check-ins", "Reports"];
@@ -200,7 +240,10 @@ function DetailsPanel({ token, clientId, weekParam, onErr }) {
     const [data, setData] = useState(null);
     const [sg, setSg] = useState(null);
     const [history, setHistory] = useState([]);
+    const [bodyHist, setBodyHist] = useState([]);
+    const [progression, setProgression] = useState([]);
     const [tab, setTab] = useState("Overview");
+    const [metricsView, setMetricsView] = useState("body");
     const qs = weekParam ? `?week=${encodeURIComponent(weekParam)}` : "";
 
     useEffect(() => {
@@ -208,15 +251,19 @@ function DetailsPanel({ token, clientId, weekParam, onErr }) {
         let cancelled = false;
         (async () => {
             try {
-                const [rep, safe, hist] = await Promise.all([
+                const [rep, safe, hist, bm, prog] = await Promise.all([
                     fetch(`/api/v1/reports/clients/${clientId}/report${qs}`, { headers: authBearerHeaders(token) }).then((r) => r.json()),
                     fetch(`/api/v1/reports/clients/${clientId}/safeguarding`, { headers: authBearerHeaders(token) }).then((r) => r.json()),
                     fetch(`/api/v1/reports/clients/${clientId}/reports`, { headers: authBearerHeaders(token) }).then((r) => r.json()),
+                    fetch(`/api/v1/reports/clients/${clientId}/body-metrics?weeks=12`, { headers: authBearerHeaders(token) }).then((r) => r.json()),
+                    fetch(`/api/v1/reports/clients/${clientId}/progression`, { headers: authBearerHeaders(token) }).then((r) => r.json()),
                 ]);
                 if (cancelled) return;
                 setData(rep.error ? null : rep);
                 if (!safe.error) setSg(safe);
                 if (Array.isArray(hist)) setHistory(hist);
+                if (Array.isArray(bm)) setBodyHist(bm);
+                if (Array.isArray(prog)) setProgression(prog);
             } catch { /* non-fatal */ }
         })();
         return () => { cancelled = true; };
@@ -275,12 +322,39 @@ function DetailsPanel({ token, clientId, weekParam, onErr }) {
 
             {tab === "Metrics" ? (
                 <div>
-                    <MiniWeight series={m.body?.weight_series} />
-                    {m.body?.trend ? (
-                        <p style={{ fontSize: 13, color: "var(--cc-text2)", marginTop: 8 }}>
-                            {m.body.trend.start} → {m.body.trend.end} {m.body.unit} ({signed(m.body.trend.change)}, {minusSign(m.body.trend.pct_change)}%)
-                        </p>
-                    ) : null}
+                    {/* Body Metrics ⇄ Exercise Metrics toggle (Everfit Metrics tab). */}
+                    <div style={{ display: "inline-flex", gap: 4, background: "var(--cc-panel2)", border: "1px solid var(--cc-border)", borderRadius: 999, padding: 3, marginBottom: 14 }}>
+                        {[["body", "Body metrics"], ["exercise", "Exercise metrics"]].map(([k, label]) => (
+                            <button key={k} type="button" onClick={() => setMetricsView(k)} style={{ border: "none", cursor: "pointer", borderRadius: 999, padding: "5px 14px", fontSize: 12.5, fontWeight: 600, background: metricsView === k ? "var(--cc-accent-bg)" : "transparent", color: metricsView === k ? "var(--cc-accent)" : "var(--cc-text2)" }}>
+                                {label}
+                            </button>
+                        ))}
+                    </div>
+
+                    {metricsView === "body" ? (
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                            <div style={{ background: "var(--cc-tile)", border: "1px solid var(--cc-border)", borderRadius: 12, padding: 14 }}>
+                                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 6 }}>
+                                    <span style={{ fontSize: 13, fontWeight: 600, color: "var(--cc-text)" }}>Weight</span>
+                                    <span style={{ fontSize: 11.5, color: "var(--cc-text3)" }}>Recent trend</span>
+                                </div>
+                                <MetricLine series={bodyHist.map((p) => ({ date: p.date, value: p.weight }))} unit="kg" />
+                            </div>
+                            <div style={{ background: "var(--cc-tile)", border: "1px solid var(--cc-border)", borderRadius: 12, padding: 14 }}>
+                                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 6 }}>
+                                    <span style={{ fontSize: 13, fontWeight: 600, color: "var(--cc-text)" }}>Body fat</span>
+                                    <span style={{ fontSize: 11.5, color: "var(--cc-text3)" }}>Recent trend</span>
+                                </div>
+                                <MetricLine series={bodyHist.map((p) => ({ date: p.date, value: p.body_fat }))} unit="%" />
+                            </div>
+                        </div>
+                    ) : (
+                        progression.length ? (
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                                {progression.map((p) => <ProgressionItem key={p.exercise} p={p} />)}
+                            </div>
+                        ) : <Empty text="No logged sets yet — exercise progression appears once the client logs weight × reps." />
+                    )}
                 </div>
             ) : null}
 
