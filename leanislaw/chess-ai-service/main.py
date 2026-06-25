@@ -2,6 +2,7 @@
 Chad chess: negamax + alpha-beta pruning. Difficulty selects search depth.
 """
 import random
+import time
 from typing import List, Optional, Tuple
 
 import chess
@@ -17,8 +18,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Search depth (plies) per difficulty — black is the AI
-DIFFICULTY_DEPTH = {"easy": 2, "medium": 4, "hard": 6}
+# Per-difficulty (max search depth, time budget seconds). Iterative deepening
+# returns the best move from the deepest iteration finished within budget, so the
+# AI stays fast on small CPUs and never exceeds the backend proxy timeout.
+DIFFICULTY = {
+    "easy": {"max_depth": 2, "budget": 1.5},
+    "medium": {"max_depth": 4, "budget": 4.0},
+    "hard": {"max_depth": 6, "budget": 8.0},
+}
+DIFFICULTY_DEPTH = {k: v["max_depth"] for k, v in DIFFICULTY.items()}
+
+
+class _TimeUp(Exception):
+    pass
 
 MATE_SCORE = 100_000
 
@@ -76,7 +88,9 @@ def order_moves(board: chess.Board) -> List[chess.Move]:
     return moves
 
 
-def negamax(board: chess.Board, depth: int, alpha: int, beta: int) -> int:
+def negamax(board: chess.Board, depth: int, alpha: int, beta: int, deadline: float) -> int:
+    if deadline and time.monotonic() > deadline:
+        raise _TimeUp()
     if board.is_checkmate() or board.is_stalemate():
         return pov_eval(board)
     if depth == 0:
@@ -85,7 +99,7 @@ def negamax(board: chess.Board, depth: int, alpha: int, beta: int) -> int:
     max_eval = -10**9
     for move in order_moves(board):
         board.push(move)
-        ev = -negamax(board, depth - 1, -beta, -alpha)
+        ev = -negamax(board, depth - 1, -beta, -alpha, deadline)
         board.pop()
         max_eval = max(max_eval, ev)
         alpha = max(alpha, ev)
@@ -94,7 +108,7 @@ def negamax(board: chess.Board, depth: int, alpha: int, beta: int) -> int:
     return max_eval
 
 
-def best_move_at_depth(board: chess.Board, depth: int) -> Optional[chess.Move]:
+def best_move_at_depth(board: chess.Board, depth: int, deadline: float = 0.0) -> Optional[chess.Move]:
     legal = list(board.legal_moves)
     if not legal:
         return None
@@ -107,7 +121,7 @@ def best_move_at_depth(board: chess.Board, depth: int) -> Optional[chess.Move]:
     beta = 10**9
     for move in order_moves(board):
         board.push(move)
-        score = -negamax(board, depth - 1, -beta, -alpha)
+        score = -negamax(board, depth - 1, -beta, -alpha, deadline)
         board.pop()
         if score > best_score:
             best_score = score
@@ -116,6 +130,25 @@ def best_move_at_depth(board: chess.Board, depth: int) -> Optional[chess.Move]:
         if alpha >= beta:
             break
     return best_m or random.choice(legal)
+
+
+def best_move_timed(board: chess.Board, max_depth: int, budget_s: float) -> Optional[chess.Move]:
+    """Iterative deepening: best move from the deepest iteration finished in budget."""
+    legal = list(board.legal_moves)
+    if not legal:
+        return None
+    deadline = time.monotonic() + max(0.2, budget_s)
+    best = random.choice(legal)
+    for d in range(1, max(1, max_depth) + 1):
+        try:
+            m = best_move_at_depth(board, d, deadline)
+        except _TimeUp:
+            break
+        if m is not None:
+            best = m
+        if time.monotonic() > deadline:
+            break
+    return best
 
 
 @app.get("/health")
@@ -132,9 +165,7 @@ def best_move(
     fen = fen.strip()
     if not fen:
         raise HTTPException(400, "fen required")
-    d = depth
-    if d is None:
-        d = DIFFICULTY_DEPTH.get(difficulty.lower(), DIFFICULTY_DEPTH["medium"])
+    cfg = DIFFICULTY.get(difficulty.lower(), DIFFICULTY["medium"])
     try:
         board = chess.Board(fen)
     except ValueError as e:
@@ -143,7 +174,11 @@ def best_move(
     if board.is_game_over():
         return {"uci": None, "done": True, "result": board.result()}
 
-    move = best_move_at_depth(board, d)
+    if depth is not None:
+        # Explicit override still gets a time cap so it can't hang.
+        move = best_move_timed(board, depth, 12.0)
+    else:
+        move = best_move_timed(board, cfg["max_depth"], cfg["budget"])
     if move is None:
         return {"uci": None, "done": True, "result": board.result()}
 
