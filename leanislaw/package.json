@@ -9,6 +9,8 @@
     "embed:knowledge": "node backend/scripts/embed-knowledge-chunks.mjs",
     "dev": "nodemon backend/server.js",
     "start": "node backend/server.js",
+    "build:frontend": "npm --prefix frontend install --include=dev && npm --prefix frontend run build",
+    "postinstall": "npm run build:frontend",
     "seed-demo-analytics": "node backend/scripts/seed-dashboard-demo.js",
     "migrate": "node backend/scripts/apply-sql-migrations.js",
     "db:list-users": "node backend/scripts/list-users.mjs",

@@ -1,5 +1,8 @@
 import express from 'express';
 import 'dotenv/config';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import { applySqlMigrations } from './lib/applySqlMigrations.js';
 import { dbConnectionHint, resolveDatabaseUrl, verifyPgConnection } from './lib/pgConnection.js';
 import exercisesRouter from './routes/exercises.js';
@@ -28,6 +31,10 @@ import { startWeeklyScheduler } from './lib/weeklyReport/schedule.js';
 
 const app = express();
 const port = Number(process.env.PORT) || 4000;
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Built frontend (Vite) — served from the same origin in production so the app's
+// relative /api/v1 calls resolve without CORS. Empty/absent in local dev (use Vite).
+const frontendDist = path.resolve(__dirname, '../frontend/dist');
 const rawOrigins = process.env.CORS_ORIGINS || '';
 const rawOriginList = rawOrigins.split(',').map((s) => s.trim()).filter(Boolean);
 // Exact origins (configured + safe localhost defaults). We never reflect an
@@ -145,6 +152,20 @@ app.use('/api/v1/users', usersRouter);
 app.use('/api/v1/exercises', exercisesRouter);
 app.use('/api/v1/workoutSessions', workoutSessionsRouter);
 app.use('/api/v1/exerciseLog', exerciseLogRouter);
+
+// Serve the built frontend (same origin) when a production build exists. Static
+// assets first, then a SPA fallback to index.html for client-side routes. API
+// paths fall through to their own 404 so they never return HTML.
+if (fs.existsSync(path.join(frontendDist, 'index.html'))) {
+    app.use(express.static(frontendDist));
+    app.use((req, res, next) => {
+        if (req.method !== 'GET' || req.path.startsWith('/api/')) return next();
+        res.sendFile(path.join(frontendDist, 'index.html'));
+    });
+    console.log('[static] serving frontend build from', frontendDist);
+} else {
+    console.log('[static] no frontend build found; API-only (run Vite for the UI in dev)');
+}
 
 function skipAutoMigrate() {
     const v = process.env.SKIP_SQL_MIGRATIONS;
