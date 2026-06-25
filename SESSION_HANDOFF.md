@@ -1,3 +1,40 @@
+# ⏩ Update — 2026-06-25 (Session 5: security hardening + Looksmax game loop)
+
+**Security pass (commit `91a8dd3`):**
+- `users.js` was unauthenticated and returned full rows (leaking every user's
+  `password_hash` + email). Now auth-required + PUBLIC-SAFE fields only; the open
+  account-creation `POST /users` is disabled; `/:id/workouts` owner-only.
+- `exercises.js` writes now require auth (tokens wired into AddExerciseModal +
+  ExerciseItem).
+- `middleware/auth.js`: removed the hardcoded JWT fallback — prod refuses to boot
+  without `JWT_SECRET`; `JWT_SECRET` is now set in `.env`.
+- `server.js`: CORS no longer reflects arbitrary origins (allowlist + localhost
+  defaults), baseline security headers, dependency-free rate limiter, 12mb json.
+- `.env` untracked (`git rm --cached`). **STILL TODO (owner): the old keys are in
+  git HISTORY — rotate `DATABASE_URL` / `OPENAI_API_KEY` / `RESEND_API_KEY` /
+  `USDA_API_KEY` at the providers.**
+
+**Looksmax game loop (commit `0c961a2`) — the gamified core:**
+- Migration 027: `user_progress`, `xp_events` (one award per action/day),
+  `achievements`.
+- `lib/looksmax/score.js`: Looksmax Score 0–100 (training/nutrition/body-trend/
+  consistency) + Sub-5 → GODCHAD rank ladder + 500-XP/level curve.
+- `lib/looksmax/engine.js`: reconciles XP **from existing logs** on each fetch
+  (no change to log flows), updates streak, unlocks achievements, builds quests.
+- `lib/looksmax/aiCoach.js`: daily coach line via Claude grounded in the
+  creator's principles file; deterministic fallback without `ANTHROPIC_API_KEY`.
+- `routes/looksmax.js`: `GET /me/journey`, `/me/coach`, `/leaderboard`.
+- `LooksmaxHome.jsx` (`/ascend`): game-themed screen (score ring, rank, streak
+  flame, level/XP, tappable quests, coach line, pillar bars, achievement badges).
+  Entry via `AscendSignpost` (floating, all users) + a hero card in the coaching hub.
+- Demo: Marcus (21) seeded to **GODCHAD / score 93 / 7-day streak** for showcasing.
+  NOTE this relies on data dated to the real "today" — reseed if the date drifts.
+
+Still not consolidated: the OpenAI "Chad" chat (`chat.js`, gpt-4o-mini) and this
+Claude coach are separate; folding the chat onto Claude is the remaining AI unify step.
+
+---
+
 # ⏩ Update — 2026-06-21 (Session 4: Everfit-faithful layout dupe)
 
 Restructured the coach console to mirror Everfit's IA using `docs/everfit-reference/`
