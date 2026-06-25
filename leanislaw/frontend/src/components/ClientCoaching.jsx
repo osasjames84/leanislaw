@@ -88,6 +88,15 @@ const ClientCoaching = () => {
             <p style={{ margin: "0 0 16px", color: "#8e8e93", fontSize: "0.9rem" }}>{plan?.coach ? `Coached by ${plan.coach}` : "Your plan, check-ins and resources"}</p>
             {err ? <div style={{ ...card, color: "#b42318" }}>{err}</div> : null}
 
+            <button type="button" onClick={() => navigate("/ascend")} style={{ ...card, width: "100%", textAlign: "left", cursor: "pointer", border: "none", color: "#fff", background: "linear-gradient(135deg,#ff375f,#ff9f0a)", display: "flex", alignItems: "center", gap: 12 }}>
+                <span style={{ fontSize: "1.6rem" }}>⚡</span>
+                <span style={{ flex: 1 }}>
+                    <span style={{ display: "block", fontWeight: 800, fontSize: "1.05rem" }}>Your Ascension</span>
+                    <span style={{ display: "block", fontSize: "0.82rem", opacity: 0.9 }}>Looksmax score, streak, daily quests &amp; rank</span>
+                </span>
+                <span style={{ fontSize: "1.2rem", opacity: 0.9 }}>›</span>
+            </button>
+
             {prof?.profile?.goal_text ? (
                 <div style={{ ...card, background: "linear-gradient(135deg,#007aff,#0a84ff)", color: "#fff", border: "none" }}>
                     <div style={{ fontSize: "0.72rem", fontWeight: 700, opacity: 0.85, textTransform: "uppercase", letterSpacing: 0.5 }}>Your goal</div>

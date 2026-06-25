@@ -23,6 +23,7 @@ import tutorialsRouter from './routes/tutorials.js';
 import clientProfileRouter from './routes/clientProfile.js';
 import tasksRouter from './routes/tasks.js';
 import clientContentRouter from './routes/clientContent.js';
+import looksmaxRouter from './routes/looksmax.js';
 import { startWeeklyScheduler } from './lib/weeklyReport/schedule.js';
 
 const app = express();
@@ -122,6 +123,7 @@ app.use('/api/v1/tutorials', tutorialsRouter);
 app.use('/api/v1/profile', clientProfileRouter);
 app.use('/api/v1/tasks', tasksRouter);
 app.use('/api/v1/content', clientContentRouter);
+app.use('/api/v1/looksmax', looksmaxRouter);
 app.use('/api/v1/users', usersRouter);
 app.use('/api/v1/exercises', exercisesRouter);
 app.use('/api/v1/workoutSessions', workoutSessionsRouter);

@@ -36,6 +36,8 @@ import IntakeScreen from "./components/IntakeScreen";
 import ClientCoaching from "./components/ClientCoaching";
 import ClientForm from "./components/ClientForm";
 import CoachingSignpost from "./components/CoachingSignpost";
+import LooksmaxHome from "./components/LooksmaxHome";
+import AscendSignpost from "./components/AscendSignpost";
 import { AuthProvider } from "./contexts/AuthContext";
 import { UnitsProvider } from "./contexts/UnitsContext";
 import { ActiveWorkoutProvider } from "./contexts/ActiveWorkoutContext";
@@ -79,6 +81,7 @@ const App = () => {
               <Route path="/chat/friend/:friendId" element={<FriendDM />} />
               <Route path="/premium-coaching" element={<PremiumCoaching />} />
               <Route path="/me/week" element={<MyWeek />} />
+              <Route path="/ascend" element={<LooksmaxHome />} />
               <Route path="/coaching" element={<ClientCoaching />} />
               <Route path="/coaching/forms/:formId" element={<ClientForm />} />
               <Route path="/support" element={<SupportPage />} />
@@ -145,6 +148,7 @@ const App = () => {
               }
             />
             </Routes>
+            <AscendSignpost />
             <CoachingSignpost />
             <SupportSignpost />
           </ActiveWorkoutProvider>

@@ -497,6 +497,44 @@ export const mealPlans = pgTable('meal_plans', {
   created_at: timestamp('created_at').defaultNow(),
 });
 
+/** Looksmax game loop: per-user progression. */
+export const userProgress = pgTable('user_progress', {
+  user_id: integer('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  xp: integer('xp').notNull().default(0),
+  level: integer('level').notNull().default(1),
+  streak_days: integer('streak_days').notNull().default(0),
+  best_streak: integer('best_streak').notNull().default(0),
+  last_active_date: date('last_active_date'),
+  looksmax_score: integer('looksmax_score'),
+  rank: varchar('rank', { length: 24 }),
+  updated_at: timestamp('updated_at').defaultNow(),
+});
+
+/** XP ledger — one award per (user, kind, date). */
+export const xpEvents = pgTable(
+  'xp_events',
+  {
+    id: serial('id').primaryKey(),
+    user_id: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    kind: varchar('kind', { length: 40 }).notNull(),
+    xp: integer('xp').notNull(),
+    date: date('date').notNull(),
+    created_at: timestamp('created_at').defaultNow(),
+  },
+  (t) => ({ xpEventsUnique: unique('xp_events_unique').on(t.user_id, t.kind, t.date) })
+);
+
+export const achievements = pgTable(
+  'achievements',
+  {
+    id: serial('id').primaryKey(),
+    user_id: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    code: varchar('code', { length: 60 }).notNull(),
+    earned_at: timestamp('earned_at').defaultNow(),
+  },
+  (t) => ({ achievementsUnique: unique('achievements_unique').on(t.user_id, t.code) })
+);
+
 export const usersRelations = relations(users, ({ many }) => ({
     workoutSessions: many(workoutSessions),
 }));
