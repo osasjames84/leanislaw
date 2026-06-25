@@ -11,7 +11,7 @@
  */
 
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
-const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
+const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL || 'claude-opus-4-8';
 
 /** Compact, factual digest of the week — the only numbers the model may use. */
 export function buildOverviewFacts({ model, progression = [], flags = [] }) {

@@ -8,7 +8,7 @@
 import { chadCorePrinciplesContext } from '../chadPrinciples.js';
 
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
-const MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
+const MODEL = process.env.ANTHROPIC_MODEL || 'claude-opus-4-8';
 
 function deterministicLine(j) {
     const q = j.quests.filter((x) => !x.done);

@@ -41,21 +41,52 @@ function normalizeSignoff(reply, shouldSignOff) {
     return cleaned.length ? `${cleaned}\nLater Gator.` : 'Later Gator.';
 }
 
-async function callOpenAiChat(apiKey, payload) {
-    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+// Opus 4.x / Fable / Mythos reject temperature — only forward it on models that accept it.
+function modelAcceptsTemperature(model) {
+    return !/^claude-(opus-4|fable|mythos)/i.test(String(model || ''));
+}
+
+/**
+ * Call Claude (Anthropic Messages API) with an OpenAI-style payload. The call sites
+ * build `{ model, temperature, messages:[{role:'system'|'user'|'assistant'}] }`; here
+ * we lift the system message into Anthropic's top-level `system` field, keep the
+ * user/assistant turns (which must start with a user turn), and add a max_tokens cap.
+ */
+async function callClaude(apiKey, payload) {
+    const model = payload.model || process.env.ANTHROPIC_MODEL || 'claude-opus-4-8';
+    const systemParts = [];
+    const turns = [];
+    for (const m of payload.messages || []) {
+        if (m.role === 'system') { systemParts.push(typeof m.content === 'string' ? m.content : ''); continue; }
+        turns.push({ role: m.role === 'assistant' ? 'assistant' : 'user', content: String(m.content ?? '') });
+    }
+    while (turns.length && turns[0].role !== 'user') turns.shift(); // Anthropic needs a user-first turn
+    if (!turns.length) turns.push({ role: 'user', content: '...' });
+
+    const body = {
+        model,
+        max_tokens: payload.max_tokens || 1024,
+        messages: turns,
+    };
+    const sys = systemParts.join('\n\n').trim();
+    if (sys) body.system = sys;
+    if (payload.temperature != null && modelAcceptsTemperature(model)) body.temperature = payload.temperature;
+
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${apiKey}`,
+            'content-type': 'application/json',
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01',
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(body),
     });
     const json = await resp.json().catch(() => ({}));
     if (!resp.ok) {
         const msg = json?.error?.message || `Chat provider error (${resp.status})`;
         throw new Error(msg);
     }
-    return json?.choices?.[0]?.message?.content?.trim() || '';
+    return (json?.content || []).map((b) => b?.text || '').join('').trim();
 }
 
 function looksLikeMuscleCalorieQuestion(text) {
@@ -131,10 +162,10 @@ function muscleSurplusFromLyleModel({ weightKg, rank }) {
     return { stage, dailyMin, dailyMax };
 }
 
-function getOpenAiConfig() {
-    const apiKey = process.env.OPENAI_API_KEY;
-    const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
-    if (!apiKey) throw new Error('OPENAI_API_KEY is not set');
+function getAiConfig() {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const model = process.env.ANTHROPIC_MODEL || 'claude-opus-4-8';
+    if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set');
     return { apiKey, model };
 }
 
@@ -526,7 +557,7 @@ router.put('/training', requireAuth, requireCoach, async (req, res) => {
 // POST /api/v1/chat { messages: [{role, content}] }
 router.post('/', requireAuth, async (req, res) => {
     try {
-        const { apiKey, model } = getOpenAiConfig();
+        const { apiKey, model } = getAiConfig();
         const userId = Number(req.userId);
         const messages = sanitizeMessages(req.body?.messages);
         if (!messages.length) {
@@ -627,7 +658,7 @@ Do not moralize; keep it practical.\n\n${principlesContext ? `${principlesContex
             ],
         };
 
-        let text = await callOpenAiChat(apiKey, payload);
+        let text = await callClaude(apiKey, payload);
         const isLilBroTrigger = /\blil bro\b/i.test(latestUser) && rank !== 'CHAD';
         const hasBoundaryLanguage = /\b(don't|do not|not)\s+lil[- ]?bro\b|\brank\b/i.test(text);
         if (isLilBroTrigger && !hasBoundaryLanguage) {
@@ -652,7 +683,7 @@ Do not moralize; keep it practical.\n\n${principlesContext ? `${principlesContex
                 ],
             };
             try {
-                text = await callOpenAiChat(apiKey, rewritePayload);
+                text = await callClaude(apiKey, rewritePayload);
             } catch {
                 // keep original draft if rewrite fails
             }
@@ -685,7 +716,7 @@ Do not moralize; keep it practical.\n\n${principlesContext ? `${principlesContex
                 ],
             };
             try {
-                text = await callOpenAiChat(apiKey, groundPayload);
+                text = await callClaude(apiKey, groundPayload);
             } catch {
                 // keep prior draft if rewrite fails
             }
@@ -700,7 +731,7 @@ Do not moralize; keep it practical.\n\n${principlesContext ? `${principlesContex
                 /\b(no cardio|without cardio|avoid cardio|skip cardio|don'?t do cardio|no extra cardio)\b/i.test(text);
             if (cardioSlip && !cardioOk) {
                 try {
-                    text = await callOpenAiChat(apiKey, {
+                    text = await callClaude(apiKey, {
                         model,
                         temperature: 0.15,
                         messages: [
@@ -719,7 +750,7 @@ Do not moralize; keep it practical.\n\n${principlesContext ? `${principlesContex
 
             if (rflReplyLooksGenericDeficit(text)) {
                 try {
-                    text = await callOpenAiChat(apiKey, {
+                    text = await callClaude(apiKey, {
                         model,
                         temperature: 0.15,
                         messages: [
