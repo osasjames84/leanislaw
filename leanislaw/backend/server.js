@@ -29,14 +29,31 @@ import { startWeeklyScheduler } from './lib/weeklyReport/schedule.js';
 const app = express();
 const port = Number(process.env.PORT) || 4000;
 const rawOrigins = process.env.CORS_ORIGINS || '';
-// Configured origins + safe localhost defaults. We never reflect an arbitrary
-// origin (the old `allowedOrigins.length === 0` branch did exactly that).
+const rawOriginList = rawOrigins.split(',').map((s) => s.trim()).filter(Boolean);
+// Exact origins (configured + safe localhost defaults). We never reflect an
+// arbitrary origin (the old `allowedOrigins.length === 0` branch did that).
 const allowedOrigins = new Set([
-    ...rawOrigins.split(',').map((s) => s.trim()).filter(Boolean),
+    ...rawOriginList.filter((o) => !o.includes('*')),
     'http://localhost:5173',
     'http://localhost:4173',
     'http://127.0.0.1:5173',
 ]);
+// Wildcard suffix entries like `*.lovable.app` → match any subdomain host.
+const allowedOriginSuffixes = rawOriginList
+    .filter((o) => o.startsWith('*.'))
+    .map((o) => o.slice(1)); // "*.lovable.app" -> ".lovable.app"
+
+function isAllowedOrigin(origin) {
+    if (!origin) return false;
+    if (allowedOrigins.has(origin)) return true;
+    if (!allowedOriginSuffixes.length) return false;
+    try {
+        const host = new URL(origin).host;
+        return allowedOriginSuffixes.some((suf) => host.endsWith(suf));
+    } catch {
+        return false;
+    }
+}
 
 // Stripe coaching webhook must use raw body for signature verification (not JSON).
 app.post(
@@ -59,7 +76,7 @@ app.use((_req, res, next) => {
 
 app.use((req, res, next) => {
     const origin = req.headers.origin;
-    if (origin && allowedOrigins.has(origin)) {
+    if (isAllowedOrigin(origin)) {
         res.header('Access-Control-Allow-Origin', origin);
         res.header('Vary', 'Origin');
         res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
