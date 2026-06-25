@@ -1,14 +1,18 @@
 import { useState } from "react";
+import { useAuth } from "../contexts/AuthContext";
+import { authBearerHeaders, authJsonHeaders } from "../apiHeaders";
 
 const ExerciseItem = ({ id, name, body_part, onDelete, onUpdate }) => {
+    const { token } = useAuth();
     const [isEditing, setIsEditing] = useState(false);
     const [editData, setEditData] = useState({ name: name, body_part: body_part });
 
     const handleDelete = async () => {
         const response = await fetch(`/api/v1/exercises/${id}`, {
             method: 'DELETE',
+            headers: authBearerHeaders(token),
         });
-        
+
         if (response.ok) {
             onDelete(id);
         }
@@ -18,7 +22,7 @@ const ExerciseItem = ({ id, name, body_part, onDelete, onUpdate }) => {
         e.preventDefault();
         const response = await fetch(`/api/v1/exercises/${id}`, {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
+            headers: authJsonHeaders(token),
             body: JSON.stringify(editData)
         });
         

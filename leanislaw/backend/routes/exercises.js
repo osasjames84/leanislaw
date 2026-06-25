@@ -4,6 +4,7 @@ const app = express()
 import { exercises } from '../schema.js';
 import { eq } from 'drizzle-orm';
 import { ilike } from 'drizzle-orm';
+import { requireAuth } from '../middleware/auth.js';
 
 app.use(express.json());
 const router = express.Router();
@@ -94,7 +95,7 @@ router.get('/exerciseName/:name', async (req, res) => {
     }
 })
 
-router.post('/', async (req , res) =>{
+router.post('/', requireAuth, async (req , res) =>{
     const {name, body_part: bp, instructions, video_url, equipment, level} = req.body;
     if(!name || !bp){
         return res.status(404).json({error: 'Missing Fields'});
@@ -127,7 +128,7 @@ router.post('/', async (req , res) =>{
     })
 });
 
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', requireAuth, async (req, res) => {
     const {id} = req.params;
 try{
     const patch = {};
@@ -152,7 +153,7 @@ try{
 });
 
 //delete exercises
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAuth, async (req, res) => {
     try {
         const { id } = req.params;
         const exerciseId = Number(id);

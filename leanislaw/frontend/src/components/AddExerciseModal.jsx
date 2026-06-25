@@ -1,6 +1,9 @@
 import React, { useState } from "react";
+import { useAuth } from "../contexts/AuthContext";
+import { authJsonHeaders } from "../apiHeaders";
 
 const AddExerciseModal = ({ onAddExercise, onClose }) => {
+  const { token } = useAuth();
   const [name, setName] = useState("");
   const [bodyPart, setBodyPart] = useState("chest"); // Default to one of your enum values
 
@@ -16,7 +19,7 @@ const AddExerciseModal = ({ onAddExercise, onClose }) => {
     try {
       const response = await fetch("/api/v1/exercises", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authJsonHeaders(token),
         body: JSON.stringify(newExercise),
       });
 

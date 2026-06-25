@@ -3,7 +3,20 @@ import { db } from '../db.js';
 import { users } from '../schema.js';
 import { eq } from 'drizzle-orm';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'leanislaw-dev-secret-change-in-production';
+// JWT secret MUST come from the environment. A hardcoded fallback lets anyone
+// reading the source forge tokens for any user — so in production we refuse to
+// start without it, and in dev we use an ephemeral random secret (tokens reset
+// on restart) rather than a well-known string.
+function resolveJwtSecret() {
+    const fromEnv = process.env.JWT_SECRET;
+    if (fromEnv && fromEnv.length >= 16) return fromEnv;
+    if (process.env.NODE_ENV === 'production') {
+        throw new Error('JWT_SECRET is not set (or too short). Refusing to start in production.');
+    }
+    console.warn('[auth] JWT_SECRET not set — using an ephemeral dev secret (tokens reset on restart).');
+    return `dev-${Math.random().toString(36).slice(2)}-${Date.now()}`;
+}
+const JWT_SECRET = resolveJwtSecret();
 
 export async function requireAuth(req, res, next) {
     const header = req.headers.authorization;

@@ -28,10 +28,14 @@ import { startWeeklyScheduler } from './lib/weeklyReport/schedule.js';
 const app = express();
 const port = Number(process.env.PORT) || 4000;
 const rawOrigins = process.env.CORS_ORIGINS || '';
-const allowedOrigins = rawOrigins
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
+// Configured origins + safe localhost defaults. We never reflect an arbitrary
+// origin (the old `allowedOrigins.length === 0` branch did exactly that).
+const allowedOrigins = new Set([
+    ...rawOrigins.split(',').map((s) => s.trim()).filter(Boolean),
+    'http://localhost:5173',
+    'http://localhost:4173',
+    'http://127.0.0.1:5173',
+]);
 
 // Stripe coaching webhook must use raw body for signature verification (not JSON).
 app.post(
@@ -40,12 +44,21 @@ app.post(
     handleStripeCoachingWebhook
 );
 
-app.use(express.json());
+app.use(express.json({ limit: '12mb' })); // base64 progress photos / DM images
+
+// Baseline security headers (helmet-equivalent, no dependency).
+app.use((_req, res, next) => {
+    res.header('X-Content-Type-Options', 'nosniff');
+    res.header('X-Frame-Options', 'DENY');
+    res.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.header('X-DNS-Prefetch-Control', 'off');
+    res.header('Cross-Origin-Resource-Policy', 'same-site');
+    next();
+});
 
 app.use((req, res, next) => {
     const origin = req.headers.origin;
-    if (!origin) return next();
-    if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+    if (origin && allowedOrigins.has(origin)) {
         res.header('Access-Control-Allow-Origin', origin);
         res.header('Vary', 'Origin');
         res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -54,6 +67,32 @@ app.use((req, res, next) => {
     if (req.method === 'OPTIONS') return res.status(204).end();
     next();
 });
+
+// Lightweight in-memory rate limiter (no dependency). Tighter on auth routes to
+// blunt credential brute-forcing.
+const rateBuckets = new Map();
+function rateLimit({ windowMs, max }) {
+    return (req, res, next) => {
+        const key = `${req.ip}:${req.baseUrl}`;
+        const now = Date.now();
+        const b = rateBuckets.get(key);
+        if (!b || now > b.reset) {
+            rateBuckets.set(key, { count: 1, reset: now + windowMs });
+            return next();
+        }
+        b.count += 1;
+        if (b.count > max) {
+            res.header('Retry-After', String(Math.ceil((b.reset - now) / 1000)));
+            return res.status(429).json({ error: 'Too many requests. Please slow down.' });
+        }
+        next();
+    };
+}
+// Periodically prune expired buckets.
+setInterval(() => { const now = Date.now(); for (const [k, b] of rateBuckets) if (now > b.reset) rateBuckets.delete(k); }, 60000).unref?.();
+
+app.use('/api/v1/auth', rateLimit({ windowMs: 15 * 60 * 1000, max: 50 }));
+app.use('/api/v1', rateLimit({ windowMs: 60 * 1000, max: 300 }));
 
 // Middleware logs timestamp, method, and URL.
 app.use((req, _res, next) => {
