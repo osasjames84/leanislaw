@@ -203,6 +203,19 @@ async function start() {
         console.log(`Server running on port ${port}`);
     });
     startWeeklyScheduler();
+    startChessKeepAlive();
+}
+
+// The chess-AI service is on Render's free tier and sleeps after ~15 min idle,
+// which cold-starts the first move past the proxy timeout. This always-on backend
+// pings its /health every 10 min to keep it warm so AI moves stay instant.
+function startChessKeepAlive() {
+    const base = process.env.CHESS_AI_SERVICE_URL?.replace(/\/$/, '');
+    if (!base) return;
+    const ping = () => fetch(`${base}/health`).catch(() => {});
+    setTimeout(ping, 10_000);
+    setInterval(ping, 10 * 60 * 1000).unref?.();
+    console.log('[chess] keep-alive enabled for', base);
 }
 
 start();

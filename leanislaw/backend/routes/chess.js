@@ -32,7 +32,7 @@ router.get('/move', requireAuth, async (req, res) => {
 
     try {
         const ctrl = new AbortController();
-        const t = setTimeout(() => ctrl.abort(), 25_000);
+        const t = setTimeout(() => ctrl.abort(), 40_000);
         const r = await fetch(url.toString(), { signal: ctrl.signal });
         clearTimeout(t);
         const text = await r.text();
