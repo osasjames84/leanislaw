@@ -131,40 +131,43 @@ router.post('/', requireAuth, async (req, res) => {
     }
 })
 
-router.patch('/:id', requireAuth, async (req, res) => {
+// Update a session (name/notes/is_template) and finish it (end_time). The
+// client "Finish & save" sends PUT with end_time, so accept BOTH PUT and PATCH;
+// previously only PATCH existed (and it ignored end_time), so finishing 404'd.
+async function updateSessionHandler(req, res) {
     const workoutSessionsId = Number(req.params.id);
     const userId = uid(req);
-    const { name, is_template, notes } = req.body;
-
+    const { name, is_template, notes, end_time, endTime } = req.body;
     try {
         const owned = await getSessionForUser(workoutSessionsId, userId);
         if (!owned) {
             return res.status(404).send({ message: 'Not found' });
         }
-
         const patch = {};
         if (name !== undefined) patch.name = name;
         if (is_template !== undefined) patch.is_template = is_template;
         if (notes !== undefined) patch.notes = notes;
-
+        const end = end_time ?? endTime;
+        if (end !== undefined) {
+            const d = end ? new Date(end) : null;
+            patch.endTime = d && !Number.isNaN(d.getTime()) ? d : null;
+        }
         const [updatedSession] = await db
             .update(workoutSessions)
             .set(patch)
             .where(and(eq(workoutSessions.id, workoutSessionsId), eq(workoutSessions.user_id, userId)))
             .returning();
-
         if (!updatedSession) {
             return res.status(404).send({ message: 'Not found' });
         }
-
-        res.status(201).json({
-            message: `Workout session ${updatedSession.name} has been updated`,
-        });
+        res.status(200).json(updatedSession);
     } catch (err) {
-        console.error(err);
+        console.error('update session:', err);
         res.status(500).json({ error: err.message });
     }
-});
+}
+router.patch('/:id', requireAuth, updateSessionHandler);
+router.put('/:id', requireAuth, updateSessionHandler);
 
 router.delete('/:id', requireAuth, async (req, res) => {
     try {
