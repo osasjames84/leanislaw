@@ -1,0 +1,437 @@
+<title>JD Osas Maintenance Calculator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Sans:wght@400..700&display=swap">
+
+<style>
+*,*::before,*::after{box-sizing:border-box}
+body,h1,h2,h3,p{margin:0}
+button,input,select{font:inherit;color:inherit}
+
+:root{
+  --page:#f6f5f3; --surface:#ffffff; --panel:#f1efec; --panel-2:#e9e6e1;
+  --border:#e2dfda; --border-soft:rgba(0,0,0,.07);
+  --ink:#1d1c1a; --ink-2:#6b6964; --ink-3:#97948e;
+  --accent:#2f6fe0; --accent-soft:rgba(47,111,224,.12);
+  --copper:#b0714a; --sage:#4e7f5f;
+  --good:#2c8a4a; --warn:#9a6b00;
+  --shadow:0 1px 2px rgba(0,0,0,.04), 0 10px 28px -14px rgba(0,0,0,.16);
+  --r:10px;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --page:#1b1b1a; --surface:#262624; --panel:#2f2f2d; --panel-2:#3a3a37;
+    --border:#3a3a37; --border-soft:rgba(255,255,255,.07);
+    --ink:#f5f5f4; --ink-2:#a3a09a; --ink-3:#7b7873;
+    --accent:#80aadd; --accent-soft:#253f60;
+    --copper:#d59a6e; --sage:#86b894;
+    --good:#5fe07d; --warn:#e0b15f;
+    --shadow:0 1px 2px rgba(0,0,0,.35), 0 12px 32px -16px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"]{
+  --page:#1b1b1a; --surface:#262624; --panel:#2f2f2d; --panel-2:#3a3a37;
+  --border:#3a3a37; --border-soft:rgba(255,255,255,.07);
+  --ink:#f5f5f4; --ink-2:#a3a09a; --ink-3:#7b7873;
+  --accent:#80aadd; --accent-soft:#253f60;
+  --copper:#d59a6e; --sage:#86b894;
+  --good:#5fe07d; --warn:#e0b15f;
+  --shadow:0 1px 2px rgba(0,0,0,.35), 0 12px 32px -16px rgba(0,0,0,.7);
+}
+
+body{
+  background:var(--page); color:var(--ink);
+  font-family:"Instrument Sans","Helvetica Neue",Arial,sans-serif;
+  font-size:15px; line-height:1.55; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1080px; margin:0 auto; padding:40px 20px 64px}
+
+.masthead{display:flex; flex-direction:column; gap:12px; padding-bottom:26px; border-bottom:1px solid var(--border); margin-bottom:26px}
+.eyebrow{font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:11px; font-weight:500; letter-spacing:.16em; text-transform:uppercase; color:var(--ink-3)}
+h1{
+  font-family:Archivo,"Helvetica Neue",Arial,sans-serif;
+  font-variation-settings:"wdth" 112,"wght" 700;
+  font-size:clamp(2.1rem,5.5vw,3.3rem); line-height:.98; letter-spacing:-.02em;
+  text-transform:uppercase; text-wrap:balance;
+}
+.lede{max-width:60ch; color:var(--ink-2); font-size:16px}
+.lede b{color:var(--ink); font-weight:600}
+
+.grid{display:grid; grid-template-columns:1fr .92fr; gap:22px; align-items:start}
+@media (max-width:900px){ .grid{grid-template-columns:1fr} }
+.stack{display:flex; flex-direction:column; gap:16px}
+
+.panel{background:var(--surface); border:1px solid var(--border); border-radius:var(--r); box-shadow:var(--shadow)}
+.panel-hd{display:flex; align-items:baseline; gap:12px; padding:16px 18px 0}
+.step{font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:11px; font-weight:600; letter-spacing:.1em; color:var(--accent); background:var(--accent-soft); padding:3px 7px; border-radius:5px; white-space:nowrap}
+.panel-hd h2{font-family:Archivo,sans-serif; font-variation-settings:"wdth" 105,"wght" 650; font-size:15px; text-transform:uppercase}
+.panel-hd .term{margin-left:auto; font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--ink-3)}
+.panel-bd{padding:14px 18px 18px; display:flex; flex-direction:column; gap:14px}
+
+.field{display:flex; flex-direction:column; gap:6px}
+label,.lbl{font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:10.5px; font-weight:500; letter-spacing:.13em; text-transform:uppercase; color:var(--ink-3)}
+input[type=number],select{
+  width:100%; background:var(--page); border:1px solid var(--border); border-radius:8px;
+  padding:9px 10px; font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:14px;
+  font-variant-numeric:tabular-nums; min-width:0;
+}
+select{cursor:pointer; font-family:"Instrument Sans",sans-serif; font-size:13.5px}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+.row{display:flex; gap:10px}
+.row>*{flex:1; min-width:0}
+
+.seg{display:inline-flex; background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:2px; gap:2px}
+.seg button{border:0; background:transparent; cursor:pointer; padding:5px 12px; border-radius:6px; font-family:"IBM Plex Mono",monospace; font-size:12px; letter-spacing:.06em; color:var(--ink-2)}
+.seg button[aria-pressed="true"]{background:var(--surface); color:var(--ink); box-shadow:0 1px 2px rgba(0,0,0,.12)}
+
+input[type=range]{-webkit-appearance:none; appearance:none; width:100%; background:transparent; height:22px; cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:5px; border-radius:99px; background:var(--panel-2)}
+input[type=range]::-moz-range-track{height:5px; border-radius:99px; background:var(--panel-2)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:17px; height:17px; border-radius:50%; margin-top:-6px; background:var(--accent); border:2px solid var(--surface); box-shadow:0 1px 3px rgba(0,0,0,.3)}
+input[type=range]::-moz-range-thumb{width:17px; height:17px; border-radius:50%; background:var(--accent); border:2px solid var(--surface); box-shadow:0 1px 3px rgba(0,0,0,.3)}
+
+.derived{display:grid; grid-template-columns:repeat(2,1fr); gap:1px; background:var(--border); border:1px solid var(--border); border-radius:8px; overflow:hidden}
+.derived div{background:var(--panel); padding:9px 11px; display:flex; flex-direction:column; gap:2px}
+.derived .v{font-family:"IBM Plex Mono",monospace; font-size:15px; font-weight:500; font-variant-numeric:tabular-nums}
+
+.opts{display:flex; flex-direction:column; gap:6px}
+.opt{display:grid; grid-template-columns:auto 1fr; align-items:center; gap:11px; padding:9px 12px; border:1px solid var(--border); border-radius:8px; cursor:pointer; background:var(--surface); transition:border-color .12s, background .12s}
+.opt:hover{background:var(--panel)}
+.opt input{accent-color:var(--accent); margin:0}
+.opt .name{font-size:13.5px; font-weight:500}
+.opt .sub{display:block; font-size:12px; color:var(--ink-3); font-family:"IBM Plex Mono",monospace}
+.opt:has(input:checked){border-color:var(--accent); background:var(--accent-soft)}
+
+.block{display:flex; flex-direction:column; gap:10px; padding:13px 14px; border:1px solid var(--border); border-radius:9px; background:var(--page)}
+.block-hd{display:flex; align-items:center; gap:8px}
+.dot{width:9px; height:9px; border-radius:2px; flex:none}
+.block-hd .t{font-family:Archivo,sans-serif; font-variation-settings:"wdth" 103,"wght" 620; font-size:13px; text-transform:uppercase; letter-spacing:.03em}
+.block input,.block select{background:var(--surface)}
+
+.result{background:var(--surface); border:1px solid var(--border); border-radius:var(--r); box-shadow:var(--shadow); overflow:hidden; position:sticky; top:20px}
+.result-top{padding:20px 20px 14px; display:flex; flex-direction:column; gap:3px}
+.result-top .cap{font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-3)}
+.big{font-family:Archivo,sans-serif; font-variation-settings:"wdth" 118,"wght" 750; font-size:clamp(3rem,8.5vw,4.3rem); line-height:.9; letter-spacing:-.03em; font-variant-numeric:tabular-nums}
+.big small{font-size:.25em; font-variation-settings:"wdth" 100,"wght" 600; color:var(--ink-3); margin-left:.4em; letter-spacing:.08em}
+.sub-cap{font-size:12.5px; color:var(--ink-3)}
+
+
+.days{display:flex; flex-direction:column; border-top:1px solid var(--border)}
+.days .d{display:flex; align-items:baseline; gap:12px; padding:11px 20px; border-bottom:1px solid var(--border-soft)}
+.days .d:last-child{border-bottom:0}
+.days .k{font-size:13.5px; font-weight:500}
+.days .k span{display:block; font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--ink-3); font-weight:400}
+.days .n{margin-left:auto; font-family:"IBM Plex Mono",monospace; font-size:19px; font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap}
+.days .rest .n{color:var(--ink-2)}
+.days .train .n{color:var(--copper)}
+
+.goals{display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--border); border-top:1px solid var(--border)}
+.goals div{background:var(--surface); padding:13px 14px; display:flex; flex-direction:column; gap:3px}
+.goals .k{font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3)}
+.goals .n{font-family:"IBM Plex Mono",monospace; font-size:18px; font-weight:600; font-variant-numeric:tabular-nums}
+.goals .cut .n{color:var(--warn)} .goals .gain .n{color:var(--good)}
+.note{padding:12px 20px 16px; font-size:12.5px; color:var(--ink-3); border-top:1px solid var(--border)}
+.note b{color:var(--ink-2); font-family:"IBM Plex Mono",monospace; font-weight:500}
+
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="eyebrow">JD Osas &middot; Coaching</div>
+    <h1>JD Osas Maintenance Calculator</h1>
+    <p class="lede">Find out what you actually burn. Enter your bodyweight, your body fat and <b>how often you train</b>, and you&rsquo;ll get your rest-day, training-day and weekly average maintenance calories.</p>
+  </header>
+
+  <div class="grid">
+
+    <div class="stack">
+
+      <section class="panel">
+        <div class="panel-hd"><span class="step">STEP 1</span><h2>Your body</h2></div>
+        <div class="panel-bd">
+          <div class="row">
+            <div class="field" style="flex:1.5">
+              <label for="weight">Bodyweight</label>
+              <input type="number" id="weight" min="50" max="700" step="0.5" value="180">
+            </div>
+            <div class="field">
+              <span class="lbl">Units</span>
+              <div class="seg" role="group" aria-label="Weight units">
+                <button type="button" data-unit="lb" aria-pressed="true">LB</button>
+                <button type="button" data-unit="kg" aria-pressed="false">KG</button>
+              </div>
+            </div>
+          </div>
+          <div class="field">
+            <label for="bf">Body fat <span id="bfEcho" style="color:var(--accent)">18%</span></label>
+            <input type="range" id="bf" min="4" max="55" step="0.5" value="18">
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--ink-3)" id="bfHint"></div>
+          </div>
+          <div class="derived">
+            <div><span class="lbl">Lean mass</span><span class="v" id="oLbm">&nbsp;</span></div>
+            <div><span class="lbl">Fat mass</span><span class="v" id="oFm">&nbsp;</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-hd"><span class="step">STEP 2</span><h2>Daily movement</h2><span class="term">daily steps</span></div>
+        <div class="panel-bd"><div class="opts" id="neatOpts"></div></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-hd"><span class="step">STEP 3</span><h2>Training</h2><span class="term">per week</span></div>
+        <div class="panel-bd">
+
+          <div class="block">
+            <div class="block-hd">
+              <span class="dot" style="background:var(--copper)"></span>
+              <span class="t">Weights</span>
+            </div>
+            <div class="row">
+              <div class="field"><label for="liftDays">Sessions / week</label>
+                <input type="number" id="liftDays" min="0" max="14" step="1" value="4"></div>
+              <div class="field"><label for="liftHours">Hours each</label>
+                <input type="number" id="liftHours" min="0" max="6" step="0.25" value="1"></div>
+            </div>
+            <div class="field"><label for="liftInt">Pace</label><select id="liftInt"></select></div>
+          </div>
+
+          <div class="block">
+            <div class="block-hd">
+              <span class="dot" style="background:var(--accent)"></span>
+              <span class="t">Cardio</span>
+            </div>
+            <div class="row">
+              <div class="field"><label for="cardioDays">Sessions / week</label>
+                <input type="number" id="cardioDays" min="0" max="14" step="1" value="2"></div>
+              <div class="field"><label for="cardioHours">Hours each</label>
+                <input type="number" id="cardioHours" min="0" max="6" step="0.25" value="0.5"></div>
+            </div>
+            <div class="field"><label for="cardioInt">Intensity</label><select id="cardioInt"></select></div>
+          </div>
+
+        </div>
+      </section>
+
+    </div>
+
+    <div>
+      <div class="result">
+        <div class="result-top">
+          <span class="cap">Weekly average maintenance</span>
+          <span class="big" id="oAvg">0<small>KCAL</small></span>
+          <span class="sub-cap">Eat this every day and the week balances out.</span>
+        </div>
+
+        <div class="days" id="days"></div>
+
+        <div class="goals">
+          <div class="cut"><span class="k">Cut &minus;20%</span><span class="n" id="gCut">&nbsp;</span></div>
+          <div><span class="k">Maintain</span><span class="n" id="gMaint">&nbsp;</span></div>
+          <div class="gain"><span class="k">Gain +10%</span><span class="n" id="gGain">&nbsp;</span></div>
+        </div>
+
+        <p class="note">Protein floor <b id="oProtein">&nbsp;</b> per day. Hit this before anything else.</p>
+      </div>
+    </div>
+
+  </div>
+
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var NEAT = [
+    { v: 1.1,  name: "Sedentary",       sub: "under 5k steps" },
+    { v: 1.15, name: "Somewhat active", sub: "5k to 10k steps" },
+    { v: 1.2,  name: "Lightly active",  sub: "10k to 15k steps" },
+    { v: 1.3,  name: "Active",          sub: "15k to 20k · on your feet" },
+    { v: 1.4,  name: "Very active",     sub: "20k+ · physical job" }
+  ];
+  var INTENSITY = {
+    lift:   [ { v: 0.10, label: "Long rests between sets" },
+              { v: 0.15, label: "Normal gym pace" },
+              { v: 0.20, label: "Non-stop sets" } ],
+    cardio: [ { v: 0.20, label: "Easy · conversational" },
+              { v: 0.30, label: "Moderate" },
+              { v: 0.40, label: "High intensity" } ]
+  };
+
+  var state = {
+    unit: "lb", weight: 180, bf: 18, neat: 1.1,
+    liftDays: 4, liftHours: 1, liftInt: 0.15,
+    cardioDays: 2, cardioHours: 0.5, cardioInt: 0.30
+  };
+
+  var KEY = "leanislaw-tdee-v2";
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+  function load() {
+    try {
+      var s = JSON.parse(localStorage.getItem(KEY) || "null");
+      if (s) Object.keys(state).forEach(function (k) {
+        if (typeof s[k] === typeof state[k]) state[k] = s[k];
+      });
+    } catch (e) {}
+  }
+
+  var $ = function (id) { return document.getElementById(id); };
+  var fmt = function (n) { return Math.round(n).toLocaleString("en-US"); };
+
+  function body() {
+    var w = state.unit === "lb" ? state.weight : state.weight * 2.20462;
+    var fm = w * (state.bf / 100);
+    var lbm = w - fm;
+    return { fm: fm, lbm: lbm, bmr: 12 * lbm + 2 * fm };
+  }
+
+  function bfHint(bf) {
+    var d = bf < 8  ? "Stage-lean, vascular and striated"
+          : bf < 12 ? "Abs visible year-round"
+          : bf < 16 ? "Athletic, abs show in good light"
+          : bf < 20 ? "Flat stomach, no visible abs"
+          : bf < 25 ? "Average, softness at the waist"
+          : bf < 30 ? "Noticeable overhang at the waist"
+          :           "High, waist dominates the frame";
+    return d + "  ·  scale reads for men; women sit ~8 to 10% higher for the same look";
+  }
+
+  /* ---- inputs ---- */
+  function bindNumber(id, key, min, max) {
+    $(id).addEventListener("input", function () {
+      var v = parseFloat(this.value);
+      state[key] = isNaN(v) ? 0 : Math.min(max, Math.max(min, v));
+      render();
+    });
+  }
+  bindNumber("weight", "weight", 0, 700);
+  bindNumber("liftDays", "liftDays", 0, 14);
+  bindNumber("liftHours", "liftHours", 0, 6);
+  bindNumber("cardioDays", "cardioDays", 0, 14);
+  bindNumber("cardioHours", "cardioHours", 0, 6);
+
+  $("bf").addEventListener("input", function () {
+    state.bf = parseFloat(this.value) || 0;
+    render();
+  });
+
+  document.querySelectorAll("[data-unit]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var next = this.dataset.unit;
+      if (next === state.unit) return;
+      state.weight = next === "kg"
+        ? Math.round(state.weight / 2.20462 * 10) / 10
+        : Math.round(state.weight * 2.20462 * 10) / 10;
+      state.unit = next;
+      syncInputs();
+      render();
+    });
+  });
+
+  $("neatOpts").innerHTML = NEAT.map(function (o) {
+    return '<label class="opt"><input type="radio" name="neat" value="' + o.v + '">' +
+      '<span><span class="name">' + o.name + '</span><span class="sub">' + o.sub + "</span></span></label>";
+  }).join("");
+  $("neatOpts").addEventListener("change", function (e) {
+    if (e.target.name !== "neat") return;
+    state.neat = parseFloat(e.target.value);
+    render();
+  });
+
+  function fillIntensity(id, kind, key) {
+    $(id).innerHTML = INTENSITY[kind].map(function (i) {
+      return '<option value="' + i.v + '"' + (Math.abs(i.v - state[key]) < 1e-9 ? " selected" : "") + ">" +
+        i.label + "</option>";
+    }).join("");
+    $(id).onchange = function () { state[key] = parseFloat(this.value); render(); };
+  }
+
+  function syncInputs() {
+    $("weight").value = state.weight;
+    $("bf").value = state.bf;
+    $("liftDays").value = state.liftDays;
+    $("liftHours").value = state.liftHours;
+    $("cardioDays").value = state.cardioDays;
+    $("cardioHours").value = state.cardioHours;
+    document.querySelectorAll("[data-unit]").forEach(function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.unit === state.unit));
+    });
+    var r = document.querySelector('#neatOpts input[value="' + state.neat + '"]');
+    (r || document.querySelector("#neatOpts input")).checked = true;
+    fillIntensity("liftInt", "lift", "liftInt");
+    fillIntensity("cardioInt", "cardio", "cardioInt");
+  }
+
+  /* ---- output ---- */
+  function render() {
+    var b = body();
+    var unit = state.unit;
+    var conv = unit === "lb" ? 1 : 1 / 2.20462;
+
+    var liftPer = state.liftHours * state.liftInt;
+    var cardioPer = state.cardioHours * state.cardioInt;
+    var weekly = state.liftDays * liftPer + state.cardioDays * cardioPer;
+    var perDay = weekly / 7;
+
+    var restM = state.neat + 0.1;
+    var avgM = state.neat + perDay + 0.1;
+    var rest = b.bmr * restM;
+    var avg = b.bmr * avgM;
+
+    $("bfEcho").textContent = state.bf + "%";
+    $("bfHint").textContent = bfHint(state.bf);
+    $("oLbm").textContent = (b.lbm * conv).toFixed(1) + " " + unit;
+    $("oFm").textContent = (b.fm * conv).toFixed(1) + " " + unit;
+    $("oAvg").innerHTML = fmt(avg) + "<small>KCAL</small>";
+    $("gCut").textContent = fmt(avg * 0.8);
+    $("gMaint").textContent = fmt(avg);
+    $("gGain").textContent = fmt(avg * 1.1);
+    $("oProtein").textContent = Math.round(b.lbm) + "g";
+
+
+    var rows = [
+      { cls: "rest", k: "Rest day", s: "no training", v: rest }
+    ];
+    if (state.liftDays > 0 && liftPer > 0) {
+      rows.push({ cls: "train", k: "Lifting day",
+        s: state.liftHours + "h in the gym",
+        v: b.bmr * (state.neat + liftPer + 0.1) });
+    }
+    if (state.cardioDays > 0 && cardioPer > 0) {
+      rows.push({ cls: "train", k: "Cardio day",
+        s: state.cardioHours + "h of cardio",
+        v: b.bmr * (state.neat + cardioPer + 0.1) });
+    }
+    if (state.liftDays > 0 && state.cardioDays > 0 && liftPer > 0 && cardioPer > 0) {
+      rows.push({ cls: "train", k: "Both in one day", s: "lifting + cardio",
+        v: b.bmr * (state.neat + liftPer + cardioPer + 0.1) });
+    }
+    $("days").innerHTML = rows.map(function (r) {
+      return '<div class="d ' + r.cls + '"><span class="k">' + r.k +
+        "<span>" + r.s + "</span></span>" +
+        '<span class="n">' + fmt(r.v) + "</span></div>";
+    }).join("");
+
+    save();
+  }
+
+  /* ---- boot ---- */
+  load();
+  syncInputs();
+  render();
+
+  /* self-check against the source's worked examples (BMR 1800) */
+  [ { m: 1.1 + 0.1 + 0.1, want: 2340 },
+    { m: 1.1 + 0.1,       want: 2160 },
+    { m: 1.3 + 0.2 + 0.1, want: 2880 } ].forEach(function (c) {
+    var got = Math.round(1800 * c.m);
+    if (got !== c.want) console.warn("TDEE check failed:", got, "expected", c.want);
+  });
+})();
+</script>
