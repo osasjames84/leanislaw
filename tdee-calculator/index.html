@@ -14,7 +14,7 @@ button,input,select{font:inherit;color:inherit}
   --ink:#1d1c1a; --ink-2:#6b6964; --ink-3:#97948e;
   --accent:#2f6fe0; --accent-soft:rgba(47,111,224,.12);
   --copper:#b0714a; --sage:#4e7f5f;
-  --good:#2c8a4a; --warn:#9a6b00;
+  --good:#2c8a4a; --warn:#9a6b00; --bad:#b8553f;
   --shadow:0 1px 2px rgba(0,0,0,.04), 0 10px 28px -14px rgba(0,0,0,.16);
   --r:10px;
 }
@@ -25,7 +25,7 @@ button,input,select{font:inherit;color:inherit}
     --ink:#f5f5f4; --ink-2:#a3a09a; --ink-3:#7b7873;
     --accent:#80aadd; --accent-soft:#253f60;
     --copper:#d59a6e; --sage:#86b894;
-    --good:#5fe07d; --warn:#e0b15f;
+    --good:#5fe07d; --warn:#e0b15f; --bad:#e07a5f;
     --shadow:0 1px 2px rgba(0,0,0,.35), 0 12px 32px -16px rgba(0,0,0,.7);
   }
 }
@@ -35,7 +35,7 @@ button,input,select{font:inherit;color:inherit}
   --ink:#f5f5f4; --ink-2:#a3a09a; --ink-3:#7b7873;
   --accent:#80aadd; --accent-soft:#253f60;
   --copper:#d59a6e; --sage:#86b894;
-  --good:#5fe07d; --warn:#e0b15f;
+  --good:#5fe07d; --warn:#e0b15f; --bad:#e07a5f;
   --shadow:0 1px 2px rgba(0,0,0,.35), 0 12px 32px -16px rgba(0,0,0,.7);
 }
 
@@ -70,7 +70,7 @@ h1{
 
 .field{display:flex; flex-direction:column; gap:6px}
 label,.lbl{font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:10.5px; font-weight:500; letter-spacing:.13em; text-transform:uppercase; color:var(--ink-3)}
-input[type=number],select{
+input[type=number],input[type=date],select{
   width:100%; background:var(--page); border:1px solid var(--border); border-radius:8px;
   padding:9px 10px; font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:14px;
   font-variant-numeric:tabular-nums; min-width:0;
@@ -79,9 +79,11 @@ select{cursor:pointer; font-family:"Instrument Sans",sans-serif; font-size:13.5p
 input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
 .row{display:flex; gap:10px}
 .row>*{flex:1; min-width:0}
+.hrow{display:flex; gap:6px; align-items:center}
+.hu{font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--ink-3); flex:none}
 
 .seg{display:inline-flex; background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:2px; gap:2px}
-.seg button{border:0; background:transparent; cursor:pointer; padding:5px 12px; border-radius:6px; font-family:"IBM Plex Mono",monospace; font-size:12px; letter-spacing:.06em; color:var(--ink-2)}
+.seg button{border:0; background:transparent; cursor:pointer; padding:5px 12px; border-radius:6px; font-family:"IBM Plex Mono",monospace; font-size:12px; letter-spacing:.06em; color:var(--ink-2); white-space:nowrap}
 .seg button[aria-pressed="true"]{background:var(--surface); color:var(--ink); box-shadow:0 1px 2px rgba(0,0,0,.12)}
 
 input[type=range]{-webkit-appearance:none; appearance:none; width:100%; background:transparent; height:22px; cursor:pointer}
@@ -90,7 +92,7 @@ input[type=range]::-moz-range-track{height:5px; border-radius:99px; background:v
 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:17px; height:17px; border-radius:50%; margin-top:-6px; background:var(--accent); border:2px solid var(--surface); box-shadow:0 1px 3px rgba(0,0,0,.3)}
 input[type=range]::-moz-range-thumb{width:17px; height:17px; border-radius:50%; background:var(--accent); border:2px solid var(--surface); box-shadow:0 1px 3px rgba(0,0,0,.3)}
 
-.derived{display:grid; grid-template-columns:repeat(2,1fr); gap:1px; background:var(--border); border:1px solid var(--border); border-radius:8px; overflow:hidden}
+.derived{display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--border); border:1px solid var(--border); border-radius:8px; overflow:hidden}
 .derived div{background:var(--panel); padding:9px 11px; display:flex; flex-direction:column; gap:2px}
 .derived .v{font-family:"IBM Plex Mono",monospace; font-size:15px; font-weight:500; font-variant-numeric:tabular-nums}
 
@@ -108,13 +110,16 @@ input[type=range]::-moz-range-thumb{width:17px; height:17px; border-radius:50%; 
 .block-hd .t{font-family:Archivo,sans-serif; font-variation-settings:"wdth" 103,"wght" 620; font-size:13px; text-transform:uppercase; letter-spacing:.03em}
 .block input,.block select{background:var(--surface)}
 
-.result{background:var(--surface); border:1px solid var(--border); border-radius:var(--r); box-shadow:var(--shadow); overflow:hidden; position:sticky; top:20px}
+.hint{font-family:"IBM Plex Mono",monospace; font-size:11.5px; color:var(--ink-3)}
+.hint b{color:var(--ink-2); font-weight:500}
+.hint.alert{color:var(--bad)}
+
+.result{background:var(--surface); border:1px solid var(--border); border-radius:var(--r); box-shadow:var(--shadow); overflow:hidden}
 .result-top{padding:20px 20px 14px; display:flex; flex-direction:column; gap:3px}
 .result-top .cap{font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-3)}
 .big{font-family:Archivo,sans-serif; font-variation-settings:"wdth" 118,"wght" 750; font-size:clamp(3rem,8.5vw,4.3rem); line-height:.9; letter-spacing:-.03em; font-variant-numeric:tabular-nums}
 .big small{font-size:.25em; font-variation-settings:"wdth" 100,"wght" 600; color:var(--ink-3); margin-left:.4em; letter-spacing:.08em}
 .sub-cap{font-size:12.5px; color:var(--ink-3)}
-
 
 .days{display:flex; flex-direction:column; border-top:1px solid var(--border)}
 .days .d{display:flex; align-items:baseline; gap:12px; padding:11px 20px; border-bottom:1px solid var(--border-soft)}
@@ -125,24 +130,104 @@ input[type=range]::-moz-range-thumb{width:17px; height:17px; border-radius:50%; 
 .days .rest .n{color:var(--ink-2)}
 .days .train .n{color:var(--copper)}
 
-.goals{display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--border); border-top:1px solid var(--border)}
-.goals div{background:var(--surface); padding:13px 14px; display:flex; flex-direction:column; gap:3px}
-.goals .k{font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3)}
-.goals .n{font-family:"IBM Plex Mono",monospace; font-size:18px; font-weight:600; font-variant-numeric:tabular-nums}
-.goals .cut .n{color:var(--warn)} .goals .gain .n{color:var(--good)}
+.sect{border-top:1px solid var(--border); padding:15px 20px 16px; display:flex; flex-direction:column; gap:11px}
+.sect-hd{display:flex; align-items:center; gap:10px}
+.sect-hd .t{font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.13em; text-transform:uppercase; color:var(--ink-3)}
+.pill{margin-left:auto; font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.07em; text-transform:uppercase; padding:2px 8px; border-radius:99px; border:1px solid currentColor; white-space:nowrap}
+.pill.ok{color:var(--good)} .pill.warn{color:var(--warn)} .pill.bad{color:var(--bad)}
+
+.target{display:flex; align-items:baseline; gap:9px}
+.target .n{font-family:Archivo,sans-serif; font-variation-settings:"wdth" 115,"wght" 720; font-size:34px; line-height:1; letter-spacing:-.02em; font-variant-numeric:tabular-nums}
+.target .u{font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--ink-3)}
+.facts{display:grid; grid-template-columns:repeat(2,1fr); gap:10px}
+.fact{display:flex; flex-direction:column}
+.fact .k{font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3)}
+.fact .v{font-family:"IBM Plex Mono",monospace; font-size:14px; font-weight:500; font-variant-numeric:tabular-nums}
+
+.split{display:flex; height:9px; border-radius:99px; overflow:hidden; background:var(--panel-2)}
+.split span{display:block; transition:width .18s ease}
+.macro-row{display:grid; grid-template-columns:repeat(3,1fr); gap:10px}
+.macro{display:flex; flex-direction:column; gap:1px}
+.macro .k{display:flex; align-items:center; gap:6px; font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3)}
+.macro .v{font-family:"IBM Plex Mono",monospace; font-size:17px; font-weight:600; font-variant-numeric:tabular-nums}
+.macro .sw{width:8px; height:8px; border-radius:2px; flex:none}
+
+.rfl{margin-top:16px; border:1px solid var(--border); border-radius:var(--r); background:var(--surface); box-shadow:var(--shadow); overflow:hidden; transition:border-color .15s}
+.rfl.on{border-color:var(--bad)}
+.rfl-hd{display:flex; align-items:center; gap:12px; padding:14px 16px}
+.rfl-hd .t{font-family:Archivo,sans-serif; font-variation-settings:"wdth" 106,"wght" 660; font-size:14px; text-transform:uppercase; letter-spacing:.02em; display:block}
+.rfl-hd .s{display:block; font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--ink-3); margin-top:1px}
+.switch{position:relative; width:44px; height:26px; flex:none; margin-left:auto}
+.switch input{position:absolute; inset:0; width:100%; height:100%; opacity:0; margin:0; cursor:pointer; z-index:2}
+.switch .track{position:absolute; inset:0; border-radius:99px; background:var(--panel-2); transition:background .15s}
+.switch .knob{position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:var(--surface); box-shadow:0 1px 3px rgba(0,0,0,.35); transition:transform .15s}
+.switch input:checked ~ .track{background:var(--bad)}
+.switch input:checked ~ .knob{transform:translateX(18px)}
+.switch input:focus-visible ~ .track{outline:2px solid var(--accent); outline-offset:2px}
+.rfl-bd{border-top:1px solid var(--border); padding:14px 16px 16px; display:flex; flex-direction:column; gap:13px}
+.rfl-bd[hidden]{display:none}
+.warnbox{border-left:2px solid var(--bad); padding-left:11px; font-size:12.5px; color:var(--ink-2); display:flex; flex-direction:column; gap:6px}
+.warnbox b{color:var(--ink); font-weight:600}
+
 .note{padding:12px 20px 16px; font-size:12.5px; color:var(--ink-3); border-top:1px solid var(--border)}
 .note b{color:var(--ink-2); font-family:"IBM Plex Mono",monospace; font-weight:500}
 
-
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* ---- touch ----
+   iOS Safari zooms the page in whenever a focused control computes below 16px,
+   and it never zooms back out. 16px on every control is the fix. */
+@media (pointer:coarse){
+  input[type=number],input[type=date],select{font-size:16px; padding:11px 12px}
+  .seg button{font-size:14px; padding:9px 14px}
+  .opt{padding:12px}
+  .opt input{width:18px; height:18px}
+  input[type=range]{height:30px}
+  input[type=range]::-webkit-slider-thumb{width:24px; height:24px; margin-top:-9px}
+  input[type=range]::-moz-range-thumb{width:24px; height:24px}
+}
+
+.mobile-bar{display:none}
+@media (max-width:900px){
+  .wrap{
+    padding-left:max(20px, env(safe-area-inset-left));
+    padding-right:max(20px, env(safe-area-inset-right));
+  }
+  .mobile-bar{
+    display:flex; align-items:baseline; gap:12px;
+    position:sticky; top:0; z-index:20;
+    margin:-40px -20px 18px; padding:12px 20px;
+    background:var(--page); border-bottom:1px solid var(--border);
+  }
+  .mb-k{font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:10.5px; letter-spacing:.13em; text-transform:uppercase; color:var(--ink-3)}
+  .mb-v{
+    margin-left:auto; font-family:Archivo,sans-serif;
+    font-variation-settings:"wdth" 112,"wght" 700;
+    font-size:21px; font-variant-numeric:tabular-nums; letter-spacing:-.01em;
+  }
+  .mb-v small{font-size:.55em; font-variation-settings:"wdth" 100,"wght" 600; color:var(--ink-3); margin-left:.35em}
+}
+
+@media (max-width:520px){
+  .panel-hd .term{display:none}
+  .wrap{padding-top:34px}
+  .mobile-bar{margin-top:-34px}
+  .derived{grid-template-columns:repeat(3,1fr)}
+  .derived .v{font-size:13.5px}
+}
 </style>
 
 <div class="wrap">
 
+  <div class="mobile-bar">
+    <span class="mb-k" id="mBarKey">Weekly average</span>
+    <span class="mb-v" id="mBarVal">0<small>kcal</small></span>
+  </div>
+
   <header class="masthead">
     <div class="eyebrow">JD Osas &middot; Coaching</div>
     <h1>JD Osas Maintenance Calculator</h1>
-    <p class="lede">Find out what you actually burn. Enter your bodyweight, your body fat and <b>how often you train</b>, and you&rsquo;ll get your rest-day, training-day and weekly average maintenance calories.</p>
+    <p class="lede">Find out what you actually burn, then what to eat to hit your goal weight by a date you pick. Enter your body, <b>how often you train</b>, and where you want to end up.</p>
   </header>
 
   <div class="grid">
@@ -152,28 +237,54 @@ input[type=range]::-moz-range-thumb{width:17px; height:17px; border-radius:50%; 
       <section class="panel">
         <div class="panel-hd"><span class="step">STEP 1</span><h2>Your body</h2></div>
         <div class="panel-bd">
+
           <div class="row">
-            <div class="field" style="flex:1.5">
-              <label for="weight">Bodyweight</label>
-              <input type="number" id="weight" min="50" max="700" step="0.5" value="180">
+            <div class="field">
+              <span class="lbl">Sex</span>
+              <div class="seg" role="group" aria-label="Sex">
+                <button type="button" data-sex="male" aria-pressed="true">MALE</button>
+                <button type="button" data-sex="female" aria-pressed="false">FEMALE</button>
+              </div>
             </div>
             <div class="field">
               <span class="lbl">Units</span>
-              <div class="seg" role="group" aria-label="Weight units">
+              <div class="seg" role="group" aria-label="Units">
                 <button type="button" data-unit="lb" aria-pressed="true">LB</button>
                 <button type="button" data-unit="kg" aria-pressed="false">KG</button>
               </div>
             </div>
           </div>
+
+          <div class="row">
+            <div class="field">
+              <label for="heightFt">Height</label>
+              <div class="hrow" id="hImperial">
+                <input type="number" id="heightFt" min="3" max="8" step="1" value="5" inputmode="numeric" aria-label="Height feet">
+                <span class="hu">ft</span>
+                <input type="number" id="heightIn" min="0" max="11" step="1" value="10" inputmode="numeric" aria-label="Height inches">
+                <span class="hu">in</span>
+              </div>
+              <input type="number" id="heightCm" min="120" max="230" step="1" value="178" inputmode="numeric" aria-label="Height in centimetres">
+            </div>
+            <div class="field">
+              <label for="weight">Bodyweight</label>
+              <input type="number" id="weight" min="50" max="700" step="0.5" value="180" inputmode="decimal" enterkeyhint="done">
+            </div>
+          </div>
+
           <div class="field">
             <label for="bf">Body fat <span id="bfEcho" style="color:var(--accent)">18%</span></label>
             <input type="range" id="bf" min="4" max="55" step="0.5" value="18">
-            <div style="font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--ink-3)" id="bfHint"></div>
+            <div class="hint" id="bfHint"></div>
           </div>
+
           <div class="derived">
             <div><span class="lbl">Lean mass</span><span class="v" id="oLbm">&nbsp;</span></div>
             <div><span class="lbl">Fat mass</span><span class="v" id="oFm">&nbsp;</span></div>
+            <div><span class="lbl">BMI</span><span class="v" id="oBmi">&nbsp;</span></div>
           </div>
+          <div class="hint" id="heightHint"></div>
+
         </div>
       </section>
 
@@ -187,32 +298,58 @@ input[type=range]::-moz-range-thumb{width:17px; height:17px; border-radius:50%; 
         <div class="panel-bd">
 
           <div class="block">
-            <div class="block-hd">
-              <span class="dot" style="background:var(--copper)"></span>
-              <span class="t">Weights</span>
-            </div>
+            <div class="block-hd"><span class="dot" style="background:var(--copper)"></span><span class="t">Weights</span></div>
             <div class="row">
               <div class="field"><label for="liftDays">Sessions / week</label>
-                <input type="number" id="liftDays" min="0" max="14" step="1" value="4"></div>
+                <input type="number" id="liftDays" min="0" max="14" step="1" value="4" inputmode="numeric" enterkeyhint="done"></div>
               <div class="field"><label for="liftHours">Hours each</label>
-                <input type="number" id="liftHours" min="0" max="6" step="0.25" value="1"></div>
+                <input type="number" id="liftHours" min="0" max="6" step="0.25" value="1" inputmode="decimal" enterkeyhint="done"></div>
             </div>
             <div class="field"><label for="liftInt">Pace</label><select id="liftInt"></select></div>
           </div>
 
           <div class="block">
-            <div class="block-hd">
-              <span class="dot" style="background:var(--accent)"></span>
-              <span class="t">Cardio</span>
-            </div>
+            <div class="block-hd"><span class="dot" style="background:var(--accent)"></span><span class="t">Cardio</span></div>
             <div class="row">
               <div class="field"><label for="cardioDays">Sessions / week</label>
-                <input type="number" id="cardioDays" min="0" max="14" step="1" value="2"></div>
+                <input type="number" id="cardioDays" min="0" max="14" step="1" value="2" inputmode="numeric" enterkeyhint="done"></div>
               <div class="field"><label for="cardioHours">Hours each</label>
-                <input type="number" id="cardioHours" min="0" max="6" step="0.25" value="0.5"></div>
+                <input type="number" id="cardioHours" min="0" max="6" step="0.25" value="0.5" inputmode="decimal" enterkeyhint="done"></div>
             </div>
             <div class="field"><label for="cardioInt">Intensity</label><select id="cardioInt"></select></div>
           </div>
+
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-hd"><span class="step">STEP 4</span><h2>Your goal</h2><span class="term">where you want to be</span></div>
+        <div class="panel-bd">
+
+          <div class="row">
+            <div class="field">
+              <label for="goalWeight">Goal weight</label>
+              <input type="number" id="goalWeight" min="50" max="700" step="0.5" value="165" inputmode="decimal" enterkeyhint="done">
+            </div>
+            <div class="field">
+              <span class="lbl">Timeframe</span>
+              <div class="seg" role="group" aria-label="Timeframe">
+                <button type="button" data-plan="weeks" aria-pressed="true">WEEKS</button>
+                <button type="button" data-plan="date" aria-pressed="false">BY DATE</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="field" id="weeksField">
+            <label for="weeks">Weeks to get there</label>
+            <input type="number" id="weeks" min="1" max="104" step="1" value="12" inputmode="numeric" enterkeyhint="done">
+          </div>
+          <div class="field" id="dateField">
+            <label for="targetDate">Target date</label>
+            <input type="date" id="targetDate">
+          </div>
+
+          <div class="hint" id="goalHint"></div>
 
         </div>
       </section>
@@ -221,26 +358,91 @@ input[type=range]::-moz-range-thumb{width:17px; height:17px; border-radius:50%; 
 
     <div>
       <div class="result">
+
         <div class="result-top">
           <span class="cap">Weekly average maintenance</span>
           <span class="big" id="oAvg">0<small>KCAL</small></span>
-          <span class="sub-cap">Eat this every day and the week balances out.</span>
+          <span class="sub-cap">What you burn on an average day, training and rest combined.</span>
         </div>
 
         <div class="days" id="days"></div>
 
-        <div class="goals">
-          <div class="cut"><span class="k">Cut &minus;20%</span><span class="n" id="gCut">&nbsp;</span></div>
-          <div><span class="k">Maintain</span><span class="n" id="gMaint">&nbsp;</span></div>
-          <div class="gain"><span class="k">Gain +10%</span><span class="n" id="gGain">&nbsp;</span></div>
+        <div class="sect">
+          <div class="sect-hd">
+            <span class="t">Daily target to hit your goal</span>
+            <span class="pill" id="planPill"></span>
+          </div>
+          <div class="target"><span class="n" id="planTarget">0</span><span class="u">kcal per day</span></div>
+          <div class="facts">
+            <div class="fact"><span class="k">Rate</span><span class="v" id="planRate">&nbsp;</span></div>
+            <div class="fact"><span class="k" id="planWhenKey">Finishes</span><span class="v" id="planWhen">&nbsp;</span></div>
+          </div>
+          <p class="hint" id="planHint"></p>
         </div>
 
-        <p class="note">Protein floor <b id="oProtein">&nbsp;</b> per day. Hit this before anything else.</p>
+        <div class="sect">
+          <div class="sect-hd"><span class="t" id="macroTitle">Macros</span></div>
+          <div class="split" id="split">
+            <span style="background:var(--copper)"></span>
+            <span style="background:var(--sage)"></span>
+            <span style="background:var(--accent)"></span>
+          </div>
+          <div class="macro-row">
+            <div class="macro"><span class="k"><span class="sw" style="background:var(--copper)"></span>Protein</span><span class="v" id="mP">&nbsp;</span></div>
+            <div class="macro"><span class="k"><span class="sw" style="background:var(--sage)"></span>Fat</span><span class="v" id="mF">&nbsp;</span></div>
+            <div class="macro"><span class="k"><span class="sw" style="background:var(--accent)"></span>Carbs</span><span class="v" id="mC">&nbsp;</span></div>
+          </div>
+          <p class="hint" id="macroHint"></p>
+        </div>
+
+        <p class="note" id="maintNote">&nbsp;</p>
+
       </div>
+
+      <div class="rfl" id="rflCard">
+        <div class="rfl-hd">
+          <span>
+            <span class="t">Rapid fat loss</span>
+            <span class="s">Short term only.</span>
+          </span>
+          <label class="switch">
+            <input type="checkbox" id="rflToggle" aria-label="Turn on rapid fat loss">
+            <span class="track"></span><span class="knob"></span>
+          </label>
+        </div>
+        <div class="rfl-bd" id="rflBody" hidden>
+
+          <div class="warnbox" id="rflBlocked" hidden></div>
+
+          <div id="rflNumbers" class="rfl-bd" style="padding:0; border:0; gap:13px">
+          <div class="target"><span class="n" id="rflCals">0</span><span class="u">kcal per day</span></div>
+
+          <div class="macro-row">
+            <div class="macro"><span class="k"><span class="sw" style="background:var(--copper)"></span>Protein</span><span class="v" id="rP">&nbsp;</span></div>
+            <div class="macro"><span class="k"><span class="sw" style="background:var(--sage)"></span>Fat</span><span class="v" id="rF">&nbsp;</span></div>
+            <div class="macro"><span class="k"><span class="sw" style="background:var(--accent)"></span>Carbs</span><span class="v" id="rC">&nbsp;</span></div>
+          </div>
+
+          <div class="facts">
+            <div class="fact"><span class="k">Run it for at most</span><span class="v" id="rflWeeks">&nbsp;</span></div>
+            <div class="fact"><span class="k">Refeeds</span><span class="v" id="rflRefeed">&nbsp;</span></div>
+            <div class="fact"><span class="k">Expected rate</span><span class="v" id="rflRate">&nbsp;</span></div>
+            <div class="fact"><span class="k">Gets you to goal in</span><span class="v" id="rflToGoal">&nbsp;</span></div>
+          </div>
+
+          <div class="warnbox">
+            <span><b>This is a crash protocol, not a diet.</b> Protein is kept high to protect muscle while calories go very low. Keep lifting, take a multivitamin, and stay on top of sodium, potassium and water or you will feel awful.</span>
+            <span><b>Do not run this</b> if you are pregnant or breastfeeding, under 18, type 1 diabetic, have any history of disordered eating, or take medication that depends on food intake. Get cleared by a doctor first.</span>
+            <span>Come off it onto the normal target above. The first few pounds are water and they come back.</span>
+          </div>
+          </div>
+
+        </div>
+      </div>
+
     </div>
 
   </div>
-
 
 </div>
 
@@ -264,13 +466,22 @@ input[type=range]::-moz-range-thumb{width:17px; height:17px; border-radius:50%; 
               { v: 0.40, label: "High intensity" } ]
   };
 
+  var KCAL_PER_LB = 3500;   /* energy in a pound of body fat */
+  var LB_PER_KG = 2.20462;
+  var DAY = 86400000;
+
   var state = {
-    unit: "lb", weight: 180, bf: 18, neat: 1.1,
+    sex: "male", unit: "lb",
+    heightCm: 178, weight: 180, bf: 18,
+    neat: 1.1,
     liftDays: 4, liftHours: 1, liftInt: 0.15,
-    cardioDays: 2, cardioHours: 0.5, cardioInt: 0.30
+    cardioDays: 2, cardioHours: 0.5, cardioInt: 0.30,
+    goalWeight: 165, planMode: "weeks", weeks: 12,
+    targetDate: new Date(Date.now() + 84 * DAY).toISOString().slice(0, 10),
+    rfl: false
   };
 
-  var KEY = "leanislaw-tdee-v2";
+  var KEY = "leanislaw-tdee-v3";
   function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
   function load() {
     try {
@@ -283,55 +494,92 @@ input[type=range]::-moz-range-thumb{width:17px; height:17px; border-radius:50%; 
 
   var $ = function (id) { return document.getElementById(id); };
   var fmt = function (n) { return Math.round(n).toLocaleString("en-US"); };
+  var clamp = function (v, lo, hi) { return Math.min(hi, Math.max(lo, v)); };
 
+  /* ---------------- body ---------------- */
   function body() {
-    var w = state.unit === "lb" ? state.weight : state.weight * 2.20462;
-    var fm = w * (state.bf / 100);
-    var lbm = w - fm;
-    return { fm: fm, lbm: lbm, bmr: 12 * lbm + 2 * fm };
+    var lb = state.unit === "lb" ? state.weight : state.weight * LB_PER_KG;
+    var kg = lb / LB_PER_KG;
+    var fm = lb * (state.bf / 100);
+    var lbm = lb - fm;
+    var m = state.heightCm / 100;
+    return {
+      lb: lb, kg: kg, fm: fm, lbm: lbm,
+      bmr: 12 * lbm + 2 * fm,
+      bmi: m > 0 ? kg / (m * m) : 0
+    };
   }
+  function toDisplay(lb) { return state.unit === "lb" ? lb : lb / LB_PER_KG; }
+  function unitName() { return state.unit; }
 
   function bfHint(bf) {
-    var d = bf < 8  ? "Stage-lean, vascular and striated"
-          : bf < 12 ? "Abs visible year-round"
-          : bf < 16 ? "Athletic, abs show in good light"
-          : bf < 20 ? "Flat stomach, no visible abs"
-          : bf < 25 ? "Average, softness at the waist"
-          : bf < 30 ? "Noticeable overhang at the waist"
-          :           "High, waist dominates the frame";
-    return d + "  ·  scale reads for men; women sit ~8 to 10% higher for the same look";
+    var male = state.sex === "male";
+    var t = male
+      ? [[8, "Stage-lean, vascular and striated"], [12, "Abs visible year round"],
+         [16, "Athletic, abs show in good light"], [20, "Flat stomach, no visible abs"],
+         [25, "Average, softness at the waist"], [30, "Noticeable overhang at the waist"]]
+      : [[15, "Stage-lean, competition level"], [20, "Athletic, clear muscle definition"],
+         [25, "Fit and toned"], [30, "Average, healthy range"],
+         [35, "Softness through hips and waist"], [40, "Higher, waist and hips carry most"]];
+    for (var i = 0; i < t.length; i++) if (bf < t[i][0]) return t[i][1];
+    return male ? "High, waist dominates the frame" : "High, worth working down steadily";
   }
 
-  /* ---- inputs ---- */
+  /* ---------------- inputs ---------------- */
   function bindNumber(id, key, min, max) {
     $(id).addEventListener("input", function () {
       var v = parseFloat(this.value);
-      state[key] = isNaN(v) ? 0 : Math.min(max, Math.max(min, v));
+      state[key] = isNaN(v) ? 0 : clamp(v, min, max);
       render();
     });
   }
   bindNumber("weight", "weight", 0, 700);
+  bindNumber("goalWeight", "goalWeight", 0, 700);
+  bindNumber("weeks", "weeks", 1, 104);
   bindNumber("liftDays", "liftDays", 0, 14);
   bindNumber("liftHours", "liftHours", 0, 6);
   bindNumber("cardioDays", "cardioDays", 0, 14);
   bindNumber("cardioHours", "cardioHours", 0, 6);
 
-  $("bf").addEventListener("input", function () {
-    state.bf = parseFloat(this.value) || 0;
+  $("bf").addEventListener("input", function () { state.bf = parseFloat(this.value) || 0; render(); });
+  $("targetDate").addEventListener("input", function () { state.targetDate = this.value; render(); });
+
+  function readHeight() {
+    if (state.unit === "lb") {
+      var ft = parseFloat($("heightFt").value) || 0;
+      var inch = parseFloat($("heightIn").value) || 0;
+      state.heightCm = clamp((ft * 12 + inch) * 2.54, 120, 230);
+    } else {
+      state.heightCm = clamp(parseFloat($("heightCm").value) || 0, 120, 230);
+    }
     render();
+  }
+  ["heightFt", "heightIn", "heightCm"].forEach(function (id) {
+    $(id).addEventListener("input", readHeight);
   });
 
-  document.querySelectorAll("[data-unit]").forEach(function (btn) {
-    btn.addEventListener("click", function () {
+  document.querySelectorAll("[data-sex]").forEach(function (b) {
+    b.addEventListener("click", function () { state.sex = this.dataset.sex; syncInputs(); render(); });
+  });
+  document.querySelectorAll("[data-plan]").forEach(function (b) {
+    b.addEventListener("click", function () { state.planMode = this.dataset.plan; syncInputs(); render(); });
+  });
+  document.querySelectorAll("[data-unit]").forEach(function (b) {
+    b.addEventListener("click", function () {
       var next = this.dataset.unit;
       if (next === state.unit) return;
-      state.weight = next === "kg"
-        ? Math.round(state.weight / 2.20462 * 10) / 10
-        : Math.round(state.weight * 2.20462 * 10) / 10;
+      var f = next === "kg" ? 1 / LB_PER_KG : LB_PER_KG;
+      state.weight = Math.round(state.weight * f * 10) / 10;
+      state.goalWeight = Math.round(state.goalWeight * f * 10) / 10;
       state.unit = next;
-      syncInputs();
-      render();
+      syncInputs(); render();
     });
+  });
+  $("rflToggle").addEventListener("change", function () {
+    state.rfl = this.checked;
+    $("rflBody").hidden = !state.rfl;
+    $("rflCard").classList.toggle("on", state.rfl);
+    render();
   });
 
   $("neatOpts").innerHTML = NEAT.map(function (o) {
@@ -354,74 +602,315 @@ input[type=range]::-moz-range-thumb{width:17px; height:17px; border-radius:50%; 
 
   function syncInputs() {
     $("weight").value = state.weight;
+    $("goalWeight").value = state.goalWeight;
     $("bf").value = state.bf;
+    $("weeks").value = state.weeks;
+    $("targetDate").value = state.targetDate;
     $("liftDays").value = state.liftDays;
     $("liftHours").value = state.liftHours;
     $("cardioDays").value = state.cardioDays;
     $("cardioHours").value = state.cardioHours;
+
+    var imperial = state.unit === "lb";
+    $("hImperial").style.display = imperial ? "flex" : "none";
+    $("heightCm").style.display = imperial ? "none" : "block";
+    if (imperial) {
+      var totalIn = state.heightCm / 2.54;
+      $("heightFt").value = Math.floor(totalIn / 12);
+      $("heightIn").value = Math.round(totalIn % 12);
+    } else {
+      $("heightCm").value = Math.round(state.heightCm);
+    }
+
+    $("weeksField").style.display = state.planMode === "weeks" ? "flex" : "none";
+    $("dateField").style.display = state.planMode === "date" ? "flex" : "none";
+
     document.querySelectorAll("[data-unit]").forEach(function (b) {
       b.setAttribute("aria-pressed", String(b.dataset.unit === state.unit));
     });
+    document.querySelectorAll("[data-sex]").forEach(function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.sex === state.sex));
+    });
+    document.querySelectorAll("[data-plan]").forEach(function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.plan === state.planMode));
+    });
+
     var r = document.querySelector('#neatOpts input[value="' + state.neat + '"]');
     (r || document.querySelector("#neatOpts input")).checked = true;
+    $("rflToggle").checked = state.rfl;
+    $("rflBody").hidden = !state.rfl;
+    $("rflCard").classList.toggle("on", state.rfl);
     fillIntensity("liftInt", "lift", "liftInt");
     fillIntensity("cardioInt", "cardio", "cardioInt");
   }
 
-  /* ---- output ---- */
+  /* ---------------- plan ---------------- */
+  function planDays() {
+    if (state.planMode === "weeks") return Math.max(1, state.weeks * 7);
+    var t = new Date(state.targetDate + "T00:00:00");
+    if (isNaN(t.getTime())) return 1;
+    var now = new Date(); now.setHours(0, 0, 0, 0);
+    return Math.max(1, Math.round((t - now) / DAY));
+  }
+  function prettyDate(d) {
+    return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+  }
+  function calorieFloor() { return state.sex === "male" ? 1500 : 1200; }
+
+  function buildPlan(b, avg) {
+    var goalLb = state.unit === "lb" ? state.goalWeight : state.goalWeight * LB_PER_KG;
+    var deltaLb = b.lb - goalLb;                 /* positive means fat to lose */
+    var days = planDays();
+    var weeks = days / 7;
+    var dir = Math.abs(deltaLb) < 0.5 ? "hold" : (deltaLb > 0 ? "lose" : "gain");
+    var perDay = (Math.abs(deltaLb) * KCAL_PER_LB) / days;
+    var target = dir === "hold" ? avg : (dir === "lose" ? avg - perDay : avg + perDay);
+    var rate = Math.abs(deltaLb) / weeks;        /* lb per week */
+    var ratePct = b.lb > 0 ? (rate / b.lb) * 100 : 0;
+
+    var pill = { cls: "ok", text: "Steady" }, hint = "";
+    var floor = calorieFloor();
+    var floored = false, flooredRate = 0, flooredWeeks = 0;
+
+    if (dir === "hold") {
+      pill = { cls: "ok", text: "Maintain" };
+      target = avg;
+      hint = "Your goal weight is where you already are, so this is your maintenance number. Train hard and the composition changes without the scale moving.";
+    } else if (dir === "lose") {
+      if (ratePct <= 0.5) pill = { cls: "ok", text: "Comfortable" };
+      else if (ratePct <= 1) pill = { cls: "ok", text: "Steady" };
+      else if (ratePct <= 1.5) pill = { cls: "warn", text: "Aggressive" };
+      else pill = { cls: "bad", text: "Too fast" };
+
+      hint = "That is a " + fmt(perDay) + " kcal deficit a day.";
+      if (ratePct > 1) {
+        var safeWeeks = Math.ceil(Math.abs(deltaLb) / (b.lb * 0.01));
+        hint += " Losing more than 1% of bodyweight a week costs you muscle. Give it " +
+                safeWeeks + " weeks instead and you keep what you built.";
+      }
+      if (target < floor) {
+        var room = avg - floor;                    /* the deepest cut we will allow */
+        target = floor;
+        floored = true;
+        if (room <= 5) {
+          pill = { cls: "bad", text: "Not possible yet" };
+          hint = "You would have to eat under " + fmt(floor) + " kcal to lose at any speed, and that is " +
+                 "too little to run on. Add daily steps or training first. That raises what you burn and " +
+                 "buys you the room to cut.";
+        } else {
+          flooredRate = (room * 7) / KCAL_PER_LB;
+          flooredWeeks = Math.ceil(Math.abs(deltaLb) / flooredRate);
+          pill = { cls: "bad", text: "Timeline too short" };
+          hint = "Hitting that date means eating under " + fmt(floor) + " kcal, which is too little. " +
+                 "At " + fmt(floor) + " kcal you would lose " + toDisplay(flooredRate).toFixed(2) + " " +
+                 unitName() + " a week and get there in about " + flooredWeeks + " weeks. Take that long, " +
+                 "add cardio to widen the gap, or use the rapid fat loss protocol below with supervision.";
+        }
+      } else if (target < b.bmr) {
+        hint += " This sits below what your body burns at rest, so treat it as short term.";
+      }
+    } else {
+      if (ratePct <= 0.25) pill = { cls: "ok", text: "Lean gain" };
+      else if (ratePct <= 0.5) pill = { cls: "warn", text: "Fast" };
+      else pill = { cls: "bad", text: "Mostly fat" };
+      hint = "That is a " + fmt(perDay) + " kcal surplus a day. " +
+             "Above roughly 0.5% of bodyweight a week most of the gain is fat, not muscle.";
+    }
+
+    var when, whenKey;
+    if (floored) {
+      rate = flooredRate;
+      whenKey = flooredRate > 0 ? "Earliest" : "Finishes";
+      when = flooredRate > 0
+        ? prettyDate(new Date(Date.now() + flooredWeeks * 7 * DAY))
+        : "not on this plan";
+    } else if (state.planMode === "weeks") {
+      whenKey = "Finishes";
+      when = prettyDate(new Date(Date.now() + days * DAY));
+    } else {
+      whenKey = "That is";
+      when = (Math.round(weeks * 10) / 10) + " weeks";
+    }
+
+    return {
+      dir: dir, target: Math.max(0, target), rate: rate, ratePct: ratePct,
+      deltaLb: deltaLb, days: days, weeks: weeks,
+      pill: pill, hint: hint, when: when, whenKey: whenKey, goalLb: goalLb
+    };
+  }
+
+  /* ---------------- macros ---------------- */
+  function macros(b, plan) {
+    var cat, pPerLb, fPerLb;
+    if (plan.dir === "lose")      { cat = "Fat loss";  pPerLb = 1.1; fPerLb = 0.35; }
+    else if (plan.dir === "gain") { cat = "Lean gain"; pPerLb = 0.9; fPerLb = 0.40; }
+    else                          { cat = "Recomp";    pPerLb = 1.0; fPerLb = 0.40; }
+
+    var cals = plan.target;
+    var p = Math.round(pPerLb * b.lbm);
+    var f = Math.round(fPerLb * b.lb);
+    var c = (cals - p * 4 - f * 9) / 4;
+    var note = "";
+
+    if (c < 40) {
+      f = Math.max(Math.round(0.25 * b.lb), Math.round((cals - p * 4 - 160) / 9));
+      c = (cals - p * 4 - f * 9) / 4;
+      note = "Fat is down to the minimum that keeps hormones happy. ";
+    }
+    if (c < 0) {
+      c = 0;
+      f = Math.max(0, Math.round((cals - p * 4) / 9));
+      note = "There is no room left for carbs at this calorie level. Stretch the timeline or look at the rapid fat loss protocol. ";
+    }
+    c = Math.round(c);
+
+    note += "Protein is the number that matters most. Hit it every day and the rest is flexible.";
+    return { cat: cat, p: p, f: f, c: c, note: note };
+  }
+
+  /* ---------------- rapid fat loss ---------------- */
+  function rflPlan(b, avg, plan) {
+    var sessions = state.liftDays + state.cardioDays;
+    var gPerLb = sessions === 0 ? 1.2 : (sessions <= 3 ? 1.4 : 1.6);
+    var p = Math.round(gPerLb * b.lbm);
+    var f = 20;   /* essential fats only */
+    var c = 30;   /* green vegetables */
+    var cals = p * 4 + f * 9 + c * 4;
+
+    var male = state.sex === "male";
+    var tooLean = state.bf < (male ? 10 : 18);
+    var maxWeeks, refeed;
+    if (state.bf >= (male ? 24 : 32))      { maxWeeks = 12; refeed = "One every 2 weeks"; }
+    else if (state.bf >= (male ? 16 : 24)) { maxWeeks = 8;  refeed = "One per week"; }
+    else                                   { maxWeeks = 4;  refeed = "Two per week"; }
+
+    var perWeek = ((avg - cals) * 7) / KCAL_PER_LB;
+    var toGoal = (plan.dir === "lose" && perWeek > 0)
+      ? Math.ceil(plan.deltaLb / perWeek) : 0;
+
+    return { p: p, f: f, c: c, cals: cals, maxWeeks: maxWeeks, refeed: refeed,
+             perWeek: perWeek, toGoal: toGoal, tooLean: tooLean };
+  }
+
+  /* ---------------- render ---------------- */
   function render() {
     var b = body();
-    var unit = state.unit;
-    var conv = unit === "lb" ? 1 : 1 / 2.20462;
+    var u = unitName();
 
     var liftPer = state.liftHours * state.liftInt;
     var cardioPer = state.cardioHours * state.cardioInt;
-    var weekly = state.liftDays * liftPer + state.cardioDays * cardioPer;
-    var perDay = weekly / 7;
+    var perDayTraining = (state.liftDays * liftPer + state.cardioDays * cardioPer) / 7;
+    var avg = b.bmr * (state.neat + perDayTraining + 0.1);
+    var rest = b.bmr * (state.neat + 0.1);
 
-    var restM = state.neat + 0.1;
-    var avgM = state.neat + perDay + 0.1;
-    var rest = b.bmr * restM;
-    var avg = b.bmr * avgM;
-
+    /* step 1 */
     $("bfEcho").textContent = state.bf + "%";
     $("bfHint").textContent = bfHint(state.bf);
-    $("oLbm").textContent = (b.lbm * conv).toFixed(1) + " " + unit;
-    $("oFm").textContent = (b.fm * conv).toFixed(1) + " " + unit;
+    $("oLbm").textContent = toDisplay(b.lbm).toFixed(1) + " " + u;
+    $("oFm").textContent = toDisplay(b.fm).toFixed(1) + " " + u;
+    $("oBmi").textContent = b.bmi.toFixed(1);
+
+    var m = state.heightCm / 100;
+    var lo = toDisplay(18.5 * m * m * LB_PER_KG), hi = toDisplay(24.9 * m * m * LB_PER_KG);
+    $("heightHint").innerHTML = "For your height a BMI-healthy range is <b>" +
+      lo.toFixed(0) + " to " + hi.toFixed(0) + " " + u +
+      "</b>. BMI cannot tell muscle from fat, so if you lift, expect to read high. " +
+      "The goal weight below is the number that actually counts.";
+
+    /* maintenance */
     $("oAvg").innerHTML = fmt(avg) + "<small>KCAL</small>";
-    $("gCut").textContent = fmt(avg * 0.8);
-    $("gMaint").textContent = fmt(avg);
-    $("gGain").textContent = fmt(avg * 1.1);
-    $("oProtein").textContent = Math.round(b.lbm) + "g";
 
-
-    var rows = [
-      { cls: "rest", k: "Rest day", s: "no training", v: rest }
-    ];
-    if (state.liftDays > 0 && liftPer > 0) {
-      rows.push({ cls: "train", k: "Lifting day",
-        s: state.liftHours + "h in the gym",
-        v: b.bmr * (state.neat + liftPer + 0.1) });
-    }
-    if (state.cardioDays > 0 && cardioPer > 0) {
-      rows.push({ cls: "train", k: "Cardio day",
-        s: state.cardioHours + "h of cardio",
-        v: b.bmr * (state.neat + cardioPer + 0.1) });
-    }
-    if (state.liftDays > 0 && state.cardioDays > 0 && liftPer > 0 && cardioPer > 0) {
-      rows.push({ cls: "train", k: "Both in one day", s: "lifting + cardio",
+    var rows = [{ cls: "rest", k: "Rest day", s: "no training", v: rest }];
+    if (state.liftDays > 0 && liftPer > 0) rows.push({ cls: "train", k: "Lifting day",
+      s: state.liftHours + "h in the gym", v: b.bmr * (state.neat + liftPer + 0.1) });
+    if (state.cardioDays > 0 && cardioPer > 0) rows.push({ cls: "train", k: "Cardio day",
+      s: state.cardioHours + "h of cardio", v: b.bmr * (state.neat + cardioPer + 0.1) });
+    if (state.liftDays > 0 && state.cardioDays > 0 && liftPer > 0 && cardioPer > 0)
+      rows.push({ cls: "train", k: "Both in one day", s: "lifting and cardio",
         v: b.bmr * (state.neat + liftPer + cardioPer + 0.1) });
-    }
     $("days").innerHTML = rows.map(function (r) {
-      return '<div class="d ' + r.cls + '"><span class="k">' + r.k +
-        "<span>" + r.s + "</span></span>" +
-        '<span class="n">' + fmt(r.v) + "</span></div>";
+      return '<div class="d ' + r.cls + '"><span class="k">' + r.k + "<span>" + r.s +
+        '</span></span><span class="n">' + fmt(r.v) + "</span></div>";
     }).join("");
+
+    /* goal */
+    var plan = buildPlan(b, avg);
+    var impliedFat = plan.goalLb - b.lbm;
+    if (impliedFat <= 0) {
+      $("goalHint").className = "hint alert";
+      $("goalHint").innerHTML = "You carry <b>" + toDisplay(b.lbm).toFixed(1) + " " + u +
+        "</b> of lean mass, so that goal weight is below your own skeleton and muscle. " +
+        "Pick something above it, or accept you would be giving up muscle to get there.";
+    } else {
+      var impliedBf = (impliedFat / plan.goalLb) * 100;
+      var verdict = impliedBf < (state.sex === "male" ? 6 : 14)
+        ? " That is competition-stage lean and very hard to hold."
+        : "";
+      $("goalHint").className = "hint";
+      $("goalHint").innerHTML = "Holding onto the muscle you have, <b>" +
+        toDisplay(plan.goalLb).toFixed(1) + " " + u + "</b> puts you at about <b>" +
+        impliedBf.toFixed(1) + "%</b> body fat." + verdict;
+    }
+
+    $("planTarget").textContent = fmt(plan.target);
+    $("planPill").textContent = plan.pill.text;
+    $("planPill").className = "pill " + plan.pill.cls;
+    $("planRate").textContent = plan.dir === "hold" ? "hold steady"
+      : (plan.rate > 0 ? toDisplay(plan.rate).toFixed(2) + " " + u + " / week" : "none yet");
+    $("planWhenKey").textContent = plan.whenKey;
+    $("planWhen").textContent = plan.dir === "hold" ? "ongoing" : plan.when;
+    $("planHint").textContent = plan.hint;
+
+    /* macros */
+    var mac = macros(b, plan);
+    $("macroTitle").textContent = "Macros for " + mac.cat.toLowerCase();
+    $("mP").textContent = mac.p + "g";
+    $("mF").textContent = mac.f + "g";
+    $("mC").textContent = mac.c + "g";
+    $("macroHint").textContent = mac.note;
+    var pc = mac.p * 4, fc = mac.f * 9, cc = mac.c * 4, tot = pc + fc + cc || 1;
+    var segs = $("split").children;
+    segs[0].style.width = (pc / tot) * 100 + "%";
+    segs[1].style.width = (fc / tot) * 100 + "%";
+    segs[2].style.width = (cc / tot) * 100 + "%";
+
+    $("maintNote").innerHTML = "Weigh yourself at the same time daily and work off the 7 day average. " +
+      "If it has not moved in two weeks, the numbers need adjusting, not abandoning.";
+
+    /* rapid fat loss */
+    var r = rflPlan(b, avg, plan);
+    $("rflNumbers").hidden = r.tooLean;
+    $("rflBlocked").hidden = !r.tooLean;
+    if (r.tooLean) {
+      $("rflBlocked").innerHTML = "<span><b>You are already too lean for this.</b> Rapid fat loss exists to " +
+        "strip fat off people who have plenty of it. At " + state.bf + "% there is not enough there to " +
+        "give up, and cutting this hard costs you muscle, hormones and sleep instead.</span>" +
+        "<span>Use the daily target above. If you want to get leaner still, that is a slow patient job, " +
+        "not a crash one.</span>";
+    }
+    $("rflCals").textContent = fmt(r.cals);
+    $("rP").textContent = r.p + "g";
+    $("rF").textContent = r.f + "g";
+    $("rC").textContent = r.c + "g";
+    $("rflWeeks").textContent = r.maxWeeks + " weeks";
+    $("rflRefeed").textContent = r.refeed;
+    $("rflRate").textContent = r.perWeek > 0
+      ? toDisplay(r.perWeek).toFixed(2) + " " + u + " / week" : "no deficit";
+    $("rflToGoal").textContent = r.toGoal > 0
+      ? (r.toGoal > r.maxWeeks ? r.toGoal + " weeks, longer than the cap" : r.toGoal + " weeks")
+      : "set a lower goal weight";
+
+    /* mobile running total */
+    var showTarget = plan.dir !== "hold";
+    $("mBarKey").textContent = state.rfl ? "Rapid fat loss"
+      : (showTarget ? "Daily target" : "Weekly average");
+    $("mBarVal").innerHTML = fmt(state.rfl ? r.cals : (showTarget ? plan.target : avg)) +
+      "<small>kcal</small>";
 
     save();
   }
 
-  /* ---- boot ---- */
+  /* ---------------- boot ---------------- */
   load();
   syncInputs();
   render();
@@ -431,7 +920,7 @@ input[type=range]::-moz-range-thumb{width:17px; height:17px; border-radius:50%; 
     { m: 1.1 + 0.1,       want: 2160 },
     { m: 1.3 + 0.2 + 0.1, want: 2880 } ].forEach(function (c) {
     var got = Math.round(1800 * c.m);
-    if (got !== c.want) console.warn("TDEE check failed:", got, "expected", c.want);
+    if (got !== c.want) console.warn("maintenance check failed:", got, "expected", c.want);
   });
 })();
 </script>
