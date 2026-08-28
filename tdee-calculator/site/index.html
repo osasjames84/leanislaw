@@ -666,7 +666,9 @@ input[type=range]::-moz-range-thumb{width:17px; height:17px; border-radius:50%; 
     return Math.max(1, Math.round((t - now) / DAY));
   }
   function prettyDate(d) {
-    return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+    var opts = { weekday: "short", day: "numeric", month: "short" };
+    if (d.getFullYear() !== new Date().getFullYear()) opts.year = "numeric";
+    return d.toLocaleDateString("en-GB", opts);
   }
   function calorieFloor() { return state.sex === "male" ? 1500 : 1200; }
 
@@ -726,8 +728,15 @@ input[type=range]::-moz-range-thumb{width:17px; height:17px; border-radius:50%; 
       if (ratePct <= 0.25) pill = { cls: "ok", text: "Lean gain" };
       else if (ratePct <= 0.5) pill = { cls: "warn", text: "Fast" };
       else pill = { cls: "bad", text: "Mostly fat" };
-      hint = "That is a " + fmt(perDay) + " kcal surplus a day. " +
-             "Above roughly 0.5% of bodyweight a week most of the gain is fat, not muscle.";
+      hint = "That is a " + fmt(perDay) + " kcal surplus a day.";
+      if (ratePct > 0.5) {
+        hint += " Above roughly 0.5% of bodyweight a week most of what you add is fat " +
+                "rather than muscle. Slow it down and the gain stays cleaner.";
+      } else if (ratePct > 0.25) {
+        hint += " That is on the quick side. Watch your waist and ease off if it climbs.";
+      } else {
+        hint += " That pace is slow enough that most of what you add should be muscle.";
+      }
     }
 
     var when, whenKey;
@@ -756,11 +765,13 @@ input[type=range]::-moz-range-thumb{width:17px; height:17px; border-radius:50%; 
   function macros(b, plan) {
     var cat, pPerLb, fPerLb;
     if (plan.dir === "lose")      { cat = "Fat loss";  pPerLb = 1.1; fPerLb = 0.35; }
-    else if (plan.dir === "gain") { cat = "Lean gain"; pPerLb = 0.9; fPerLb = 0.40; }
+    else if (plan.dir === "gain") { cat = "Lean gain"; pPerLb = 1.0; fPerLb = 0.40; }
     else                          { cat = "Recomp";    pPerLb = 1.0; fPerLb = 0.40; }
 
     var cals = plan.target;
-    var p = Math.round(pPerLb * b.lbm);
+    /* 1g per pound of lean mass is the floor in every direction. Building on
+       less than you would eat to merely hold is backwards. */
+    var p = Math.max(Math.round(pPerLb * b.lbm), Math.round(b.lbm));
     var f = Math.round(fPerLb * b.lb);
     var c = (cals - p * 4 - f * 9) / 4;
     var note = "";
