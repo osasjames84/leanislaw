@@ -12,6 +12,9 @@ const PORT = process.env.PORT || 3000;
 const CLOSES_AT = process.env.VOTE_CLOSES_AT ? Date.parse(process.env.VOTE_CLOSES_AT) : null;
 const ADMIN_KEY = process.env.ADMIN_KEY || "";
 const IP_CAP = parseInt(process.env.IP_CAP || "8", 10);
+/* On the real site this is set, so a missing or broken database refuses votes
+   outright instead of collecting them into memory and losing them on restart. */
+const REQUIRE_DB = process.env.REQUIRE_DB === "1";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -110,7 +113,8 @@ app.get("/api/state", async (req, res) => {
     closesAt: CLOSES_AT,
     closed: isClosed(),
     voted: voted,
-    persistent: dbReady
+    persistent: dbReady || !REQUIRE_DB,
+    notReady: REQUIRE_DB && !dbReady
   };
   if (voted || isClosed()) {
     try { payload.tallies = await getTallies(); } catch (e) { console.error("[state]", e.message); }
@@ -125,6 +129,7 @@ app.post("/api/vote", async (req, res) => {
   if (typeof voter !== "string" || voter.length < 8 || voter.length > 64)
     return res.status(400).json({ error: "bad_voter_id" });
   if (isClosed()) return res.status(403).json({ error: "closed" });
+  if (REQUIRE_DB && !dbReady) return res.status(503).json({ error: "not_ready" });
 
   try {
     const result = await recordVote(voter, slug, hashIp(req.ip));

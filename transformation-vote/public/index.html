@@ -274,6 +274,8 @@ h1{
             '<span class="n">' + v + (v === 1 ? " vote" : " votes") + "</span></div>" +
             '<div class="bar"><span style="width:' + pct.toFixed(2) + '%"></span></div>' +
           "</div>";
+      } else if (state.notReady) {
+        footer = '<button class="vote" disabled>Voting opens shortly</button>';
       } else if (state.closed) {
         footer = '<button class="vote" disabled>Voting closed</button>';
       } else {
@@ -333,9 +335,9 @@ h1{
       state.voted = !!d.voted;
       state.tallies = d.tallies || null;
       if (!state.voted && !state.closed) { state.picked = null; try { localStorage.removeItem("tv-picked"); } catch (e) {} }
-      if (!d.persistent) {
-        $("foot").insertAdjacentHTML("beforeend",
-          '<br><span class="warnline">Note: this server is not storing votes permanently yet.</span>');
+      state.notReady = !!d.notReady;
+      if (state.notReady) {
+        $("statusMsg").innerHTML = "<b>Voting is not open yet.</b> Check back shortly.";
       }
       render(); tickClock();
     } catch (e) {
@@ -374,6 +376,9 @@ h1{
         window.scrollTo({ top: 0, behavior: "smooth" });
       } else if (d.error === "closed") {
         state.closed = true; render();
+      } else if (d.error === "not_ready") {
+        btn.disabled = false; btn.textContent = "Vote for " + name;
+        alert("Voting has not opened yet. Try again shortly.");
       } else if (d.error === "too_many_from_network") {
         btn.disabled = false; btn.textContent = "Vote for " + name;
         alert("Too many votes have come from this network already. If that seems wrong, tell JD.");
