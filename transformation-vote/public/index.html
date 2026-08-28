@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Vote: 45-Day Lean Transformation</title>
+<meta name="description" content="Eighteen finalists, six weeks apart. Pick the transformation you think deserves the $500.">
+<meta property="og:title" content="Vote: 45-Day Lean Transformation">
+<meta property="og:description" content="Eighteen finalists, six weeks apart. Pick the one you think deserves the $500.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8F%86%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Sans:wght@400..700&display=swap">
+<style>
+*,*::before,*::after{box-sizing:border-box}
+body,h1,h2,h3,p,figure{margin:0}
+button{font:inherit;color:inherit}
+
+:root{
+  --page:#141413; --surface:#1f1f1e; --raise:#2a2a28;
+  --border:#343431; --border-soft:rgba(255,255,255,.06);
+  --ink:#f5f5f4; --ink-2:#a3a09a; --ink-3:#78756f;
+  --gold:#d8a24a; --gold-soft:rgba(216,162,74,.14);
+  --accent:#80aadd;
+  --good:#5fe07d;
+  --r:14px;
+}
+body{
+  background:var(--page); color:var(--ink);
+  font-family:"Instrument Sans","Helvetica Neue",Arial,sans-serif;
+  font-size:15px; line-height:1.5; -webkit-font-smoothing:antialiased;
+  padding-bottom:88px;
+}
+.wrap{
+  max-width:1180px; margin:0 auto;
+  padding:26px max(16px,env(safe-area-inset-left)) 40px max(16px,env(safe-area-inset-right));
+}
+
+/* ---- masthead ---- */
+.head{display:flex; flex-direction:column; gap:11px; margin-bottom:8px}
+.eyebrow{
+  font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:10.5px; font-weight:500;
+  letter-spacing:.18em; text-transform:uppercase; color:var(--gold);
+}
+h1{
+  font-family:Archivo,"Helvetica Neue",Arial,sans-serif;
+  font-variation-settings:"wdth" 115,"wght" 760;
+  font-size:clamp(2rem,7vw,3.2rem); line-height:.95; letter-spacing:-.025em;
+  text-transform:uppercase; text-wrap:balance;
+}
+.lede{color:var(--ink-2); max-width:56ch; font-size:15.5px}
+.lede b{color:var(--ink); font-weight:600}
+
+.meta{display:flex; flex-wrap:wrap; gap:8px; margin-top:4px}
+.tag{
+  display:inline-flex; align-items:center; gap:7px;
+  font-family:"IBM Plex Mono",monospace; font-size:11.5px;
+  border:1px solid var(--border); background:var(--surface);
+  padding:5px 11px; border-radius:99px; color:var(--ink-2);
+}
+.tag b{color:var(--ink); font-weight:600; font-variant-numeric:tabular-nums}
+.tag.prize{border-color:var(--gold); color:var(--gold)}
+.tag.prize b{color:var(--gold)}
+
+.rule{height:1px; background:var(--border); margin:22px 0}
+
+/* ---- grid ---- */
+.grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px}
+@media (max-width:680px){ .grid{grid-template-columns:1fr; gap:14px} }
+
+.card{
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--r);
+  overflow:hidden; display:flex; flex-direction:column;
+  transition:border-color .15s, transform .15s;
+}
+.card.picked{border-color:var(--gold)}
+.card.dim{opacity:.5}
+
+.card-hd{display:flex; align-items:center; gap:10px; padding:13px 14px 11px}
+.name{
+  font-family:Archivo,sans-serif; font-variation-settings:"wdth" 108,"wght" 700;
+  font-size:19px; letter-spacing:-.01em;
+}
+.rank{
+  margin-left:auto; font-family:"IBM Plex Mono",monospace; font-size:11px;
+  color:var(--ink-3); font-variant-numeric:tabular-nums;
+}
+
+.shots{display:grid; grid-template-columns:1fr; gap:2px; background:var(--border-soft)}
+.shot{position:relative; background:#fff; cursor:zoom-in; border:0; padding:0; display:block; width:100%}
+.shot img{display:block; width:100%; height:auto; aspect-ratio:16/9; object-fit:cover}
+.shot figcaption{
+  position:absolute; left:8px; top:8px;
+  font-family:"IBM Plex Mono",monospace; font-size:9.5px; letter-spacing:.12em;
+  text-transform:uppercase; color:#1d1c1a; background:rgba(255,255,255,.82);
+  padding:2px 7px; border-radius:4px;
+}
+
+.card-ft{padding:12px 14px 14px; margin-top:auto}
+.vote{
+  width:100%; border:1px solid var(--border); background:var(--raise); color:var(--ink);
+  border-radius:10px; padding:13px; cursor:pointer; font-size:15px; font-weight:600;
+  transition:background .13s, border-color .13s, color .13s;
+}
+.vote:hover:not(:disabled){border-color:var(--gold); color:var(--gold)}
+.vote:active:not(:disabled){transform:translateY(1px)}
+.vote:disabled{cursor:default}
+.vote.chosen{background:var(--gold); border-color:var(--gold); color:#1a1a18}
+.vote:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+
+/* ---- result bars ---- */
+.res{display:flex; flex-direction:column; gap:6px}
+.res-top{display:flex; align-items:baseline; gap:8px; font-family:"IBM Plex Mono",monospace; font-size:12.5px}
+.res-top .pct{font-weight:600; font-variant-numeric:tabular-nums}
+.res-top .n{margin-left:auto; color:var(--ink-3); font-variant-numeric:tabular-nums}
+.bar{height:7px; border-radius:99px; background:var(--raise); overflow:hidden}
+.bar span{display:block; height:100%; background:var(--ink-3); transition:width .5s cubic-bezier(.2,.8,.2,1)}
+.card.picked .bar span{background:var(--gold)}
+.card.lead .bar span{background:var(--good)}
+
+/* ---- sticky status ---- */
+.statusbar{
+  position:fixed; left:0; right:0; bottom:0; z-index:40;
+  background:rgba(20,20,19,.94); backdrop-filter:blur(10px);
+  border-top:1px solid var(--border);
+  padding:12px max(16px,env(safe-area-inset-left))
+          max(12px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-right));
+}
+.statusbar .inner{max-width:1180px; margin:0 auto; display:flex; align-items:center; gap:12px}
+.statusbar .msg{font-size:13.5px; color:var(--ink-2)}
+.statusbar .msg b{color:var(--ink); font-weight:600}
+.statusbar .count{
+  margin-left:auto; font-family:"IBM Plex Mono",monospace; font-size:12px;
+  color:var(--ink-3); font-variant-numeric:tabular-nums; white-space:nowrap;
+}
+
+/* ---- lightbox ---- */
+.box{
+  position:fixed; inset:0; z-index:60; background:rgba(10,10,10,.94);
+  display:none; align-items:center; justify-content:center; padding:16px;
+}
+.box.open{display:flex}
+.box img{max-width:100%; max-height:86vh; border-radius:8px}
+.box .close{
+  position:absolute; top:calc(12px + env(safe-area-inset-top)); right:14px;
+  width:42px; height:42px; border-radius:50%; border:1px solid var(--border);
+  background:var(--surface); cursor:pointer; font-size:20px; line-height:1;
+}
+
+.foot{margin-top:28px; color:var(--ink-3); font-size:12.5px; max-width:60ch}
+.warnline{color:var(--gold)}
+.skel{height:300px; border-radius:var(--r); background:var(--surface); border:1px solid var(--border)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="head">
+    <div class="eyebrow">JD Osas &middot; 45-Day Lean Transformation</div>
+    <h1>Who had the best transformation?</h1>
+    <p class="lede">Eighteen finalists. Six weeks between the two photos in every picture. <b>You get one vote.</b> Look at all of them before you pick, then tap Vote on the one you think earned it.</p>
+    <div class="meta">
+      <span class="tag prize">&#127942; <b>$500</b> prize</span>
+      <span class="tag"><b id="tagCount">18</b> finalists</span>
+      <span class="tag" id="tagClock">Voting open</span>
+    </div>
+  </header>
+
+  <div class="rule"></div>
+
+  <main class="grid" id="grid" aria-live="polite">
+    <div class="skel"></div><div class="skel"></div><div class="skel"></div>
+  </main>
+
+  <p class="foot" id="foot">
+    Front and back shots are shown for every finalist. Tap any photo to see it full size.
+    Results stay hidden until you have voted, so nobody gets swayed by who is already ahead.
+  </p>
+</div>
+
+<div class="statusbar">
+  <div class="inner">
+    <span class="msg" id="statusMsg">Pick your winner</span>
+    <span class="count" id="statusCount"></span>
+  </div>
+</div>
+
+<div class="box" id="box" role="dialog" aria-modal="true" aria-label="Photo">
+  <button class="close" id="boxClose" aria-label="Close photo">&times;</button>
+  <img id="boxImg" alt="">
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var $ = function (id) { return document.getElementById(id); };
+  var state = { finalists: [], tallies: null, voted: false, closed: false, closesAt: null, picked: null };
+
+  /* a per-browser id so one phone gets one vote */
+  var voterId = (function () {
+    try {
+      var v = localStorage.getItem("tv-voter");
+      if (!v) {
+        v = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()).replace(/-/g, "");
+        localStorage.setItem("tv-voter", v);
+      }
+      return v;
+    } catch (e) {
+      return String(Date.now()) + String(Math.random()).slice(2, 10);
+    }
+  })();
+  try { state.picked = localStorage.getItem("tv-picked"); } catch (e) {}
+
+  /* stable per-visitor shuffle so nobody is permanently top of the list */
+  function shuffle(list, seedStr) {
+    var seed = 0;
+    for (var i = 0; i < seedStr.length; i++) seed = (seed * 31 + seedStr.charCodeAt(i)) >>> 0;
+    var a = list.slice();
+    for (var j = a.length - 1; j > 0; j--) {
+      seed = (seed * 1103515245 + 12345) >>> 0;
+      var k = seed % (j + 1);
+      var t = a[j]; a[j] = a[k]; a[k] = t;
+    }
+    return a;
+  }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  function totalVotes() {
+    if (!state.tallies) return 0;
+    var t = 0;
+    for (var k in state.tallies) t += state.tallies[k];
+    return t;
+  }
+
+  function render() {
+    var showResults = !!state.tallies;
+    var total = totalVotes();
+    var lead = null;
+    if (showResults && total > 0) {
+      var best = -1;
+      state.finalists.forEach(function (f) {
+        var v = state.tallies[f.slug] || 0;
+        if (v > best) { best = v; lead = f.slug; }
+      });
+    }
+
+    var ordered = shuffle(state.finalists, voterId);
+    if (showResults) {
+      ordered = state.finalists.slice().sort(function (a, b) {
+        return (state.tallies[b.slug] || 0) - (state.tallies[a.slug] || 0);
+      });
+    }
+
+    $("grid").innerHTML = ordered.map(function (f, i) {
+      var v = showResults ? (state.tallies[f.slug] || 0) : 0;
+      var pct = total > 0 ? (v / total) * 100 : 0;
+      var isPick = state.picked === f.slug;
+      var cls = "card" + (isPick ? " picked" : "") + (showResults && lead === f.slug ? " lead" : "");
+
+      var footer;
+      if (showResults) {
+        footer = '<div class="res">' +
+            '<div class="res-top"><span class="pct">' + pct.toFixed(1) + "%</span>" +
+            (isPick ? '<span style="color:var(--gold)">your vote</span>' : "") +
+            '<span class="n">' + v + (v === 1 ? " vote" : " votes") + "</span></div>" +
+            '<div class="bar"><span style="width:' + pct.toFixed(2) + '%"></span></div>' +
+          "</div>";
+      } else if (state.closed) {
+        footer = '<button class="vote" disabled>Voting closed</button>';
+      } else {
+        footer = '<button class="vote" data-slug="' + esc(f.slug) + '">Vote for ' + esc(f.name) + "</button>";
+      }
+
+      return '<article class="' + cls + '">' +
+          '<div class="card-hd"><span class="name">' + esc(f.name) + "</span>" +
+            (showResults ? '<span class="rank">#' + (i + 1) + "</span>" : "") +
+          "</div>" +
+          '<div class="shots">' +
+            '<button class="shot" data-src="photos/' + esc(f.slug) + '-front.jpg">' +
+              '<img loading="lazy" src="photos/' + esc(f.slug) + '-front.jpg" alt="' + esc(f.name) + ' front view, week 1 next to week 6">' +
+              "<figcaption>Front</figcaption></button>" +
+            '<button class="shot" data-src="photos/' + esc(f.slug) + '-back.jpg">' +
+              '<img loading="lazy" src="photos/' + esc(f.slug) + '-back.jpg" alt="' + esc(f.name) + ' back view, week 1 next to week 6">' +
+              "<figcaption>Back</figcaption></button>" +
+          "</div>" +
+          '<div class="card-ft">' + footer + "</div>" +
+        "</article>";
+    }).join("");
+
+    $("tagCount").textContent = state.finalists.length;
+
+    if (state.closed) {
+      $("statusMsg").innerHTML = "<b>Voting has closed.</b> Final results are in.";
+    } else if (state.voted) {
+      var pickName = "";
+      state.finalists.forEach(function (f) { if (f.slug === state.picked) pickName = f.name; });
+      $("statusMsg").innerHTML = pickName
+        ? "Thanks, your vote for <b>" + esc(pickName) + "</b> is in."
+        : "<b>Your vote is in.</b>";
+    } else {
+      $("statusMsg").innerHTML = "One vote each. Pick the transformation you rate most.";
+    }
+    $("statusCount").textContent = showResults
+      ? total + (total === 1 ? " vote cast" : " votes cast")
+      : "";
+  }
+
+  function tickClock() {
+    if (!state.closesAt) return;
+    var left = state.closesAt - Date.now();
+    if (left <= 0) { $("tagClock").textContent = "Voting closed"; return; }
+    var h = Math.floor(left / 3600000), m = Math.floor((left % 3600000) / 60000);
+    var s = Math.floor((left % 60000) / 1000);
+    $("tagClock").innerHTML = "Closes in <b>" + h + "h " + m + "m " + (h === 0 ? s + "s" : "") + "</b>";
+  }
+
+  async function load() {
+    try {
+      var r = await fetch("api/state?voter=" + encodeURIComponent(voterId), { cache: "no-store" });
+      var d = await r.json();
+      state.finalists = d.finalists || [];
+      state.closesAt = d.closesAt || null;
+      state.closed = !!d.closed;
+      state.voted = !!d.voted;
+      state.tallies = d.tallies || null;
+      if (!state.voted && !state.closed) { state.picked = null; try { localStorage.removeItem("tv-picked"); } catch (e) {} }
+      if (!d.persistent) {
+        $("foot").insertAdjacentHTML("beforeend",
+          '<br><span class="warnline">Note: this server is not storing votes permanently yet.</span>');
+      }
+      render(); tickClock();
+    } catch (e) {
+      $("grid").innerHTML = '<p style="color:var(--ink-2)">Could not load the finalists. ' +
+        "Check your connection and refresh.</p>";
+    }
+  }
+
+  document.addEventListener("click", async function (e) {
+    var shot = e.target.closest(".shot");
+    if (shot) { $("boxImg").src = shot.dataset.src; $("box").classList.add("open"); return; }
+
+    if (e.target.id === "boxClose" || e.target.id === "box") { $("box").classList.remove("open"); return; }
+
+    var btn = e.target.closest(".vote[data-slug]");
+    if (!btn) return;
+
+    var slug = btn.dataset.slug;
+    var name = btn.textContent.replace("Vote for ", "");
+    if (!confirm("Vote for " + name + "? You only get one vote and it cannot be changed.")) return;
+
+    btn.disabled = true;
+    btn.textContent = "Sending...";
+    try {
+      var r = await fetch("api/vote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug: slug, voter: voterId })
+      });
+      var d = await r.json();
+      if (r.ok || d.error === "already_voted") {
+        state.voted = true;
+        if (r.ok) { state.picked = slug; try { localStorage.setItem("tv-picked", slug); } catch (e) {} }
+        state.tallies = d.tallies || state.tallies;
+        render();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } else if (d.error === "closed") {
+        state.closed = true; render();
+      } else if (d.error === "too_many_from_network") {
+        btn.disabled = false; btn.textContent = "Vote for " + name;
+        alert("Too many votes have come from this network already. If that seems wrong, tell JD.");
+      } else {
+        btn.disabled = false; btn.textContent = "Vote for " + name;
+        alert("Something went wrong sending your vote. Try again in a moment.");
+      }
+    } catch (err) {
+      btn.disabled = false; btn.textContent = "Vote for " + name;
+      alert("No connection. Try again in a moment.");
+    }
+  });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") $("box").classList.remove("open");
+  });
+
+  load();
+  setInterval(tickClock, 1000);
+})();
+</script>
+</body>
+</html>
