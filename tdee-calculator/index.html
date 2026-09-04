@@ -351,7 +351,7 @@ input[type=range]::-moz-range-thumb{width:17px; height:17px; border-radius:50%; 
           <div class="figures" id="figures" hidden>
             <div class="fig-labels"><span>Now <b id="figNowBf"></b></span><span>Goal <b id="figGoalBf"></b></span></div>
             <canvas id="figCanvas" aria-label="Your body now and at your goal, side by side"></canvas>
-            <div class="hint fig-hint">Drag to turn. Shape follows your body fat and the muscle you have. A sense of the change, not a medical measure.</div>
+            <div class="hint fig-hint">Drag to turn. Built from your lean mass and weight: more muscle on the frame, more or less fat on top of it. Close to real, not a scan of you.</div>
           </div>
 
           <div class="field">
@@ -488,59 +488,87 @@ var Body3D = (function () {
   var n = D.nVerts, ps = 1 / D.posScale, ds = 1 / D.deltaScale;
   var SCALE = 2.0 / (D.yMax - D.yMin), YOFF = -(D.yMax + D.yMin) / 2;
 
-  function positions(sex, fatW, muscleW) {
+  /* MakeHuman's macro blend: muscle m and weight w in [0,1] (0.5 = average).
+     Each axis gives triangular weights over {min, avg, max}; the nine products
+     weight the nine grid targets (avg-avg is the base itself). This is how the
+     app composes a body, so "max muscle + min weight" is a ripped, big frame,
+     not a thin one. */
+  function tri(v) {
+    if (v > 1) return [0, 0, 2 * v - 1];   /* past the grid: keep pushing the max shape (linear deltas extrapolate cleanly) */
+    if (v < 0) return [1 - 2 * v, 0, 0];
+    return [Math.max(0, 1 - 2 * v), 1 - Math.abs(2 * v - 1), Math.max(0, 2 * v - 1)];
+  }
+  function positions(sex, m, w) {
     var p = new Float32Array(n * 3);
     for (var i = 0; i < n * 3; i++) p[i] = base[i] * ps;
-    function add(key, w) {
-      var t = T[key]; if (!t || !w) return;
-      for (var k = 0, m = t.i.length; k < m; k++) {
+    function add(key, wt) {
+      var t = T[key]; if (!t || wt < 0.002) return;
+      for (var k = 0, mm = t.i.length; k < mm; k++) {
         var vi = t.i[k] * 3, di = k * 3;
-        p[vi] += t.d[di] * ds * w; p[vi + 1] += t.d[di + 1] * ds * w; p[vi + 2] += t.d[di + 2] * ds * w;
+        p[vi] += t.d[di] * ds * wt; p[vi + 1] += t.d[di + 1] * ds * wt; p[vi + 2] += t.d[di + 2] * ds * wt;
       }
     }
     add(sex + "_base", 1);
-    add(fatW < 0 ? sex + "_thin" : sex + "_fat", Math.abs(fatW));
-    add(muscleW < 0 ? sex + "_skinny" : sex + "_muscle", Math.abs(muscleW));
+    var wm = tri(m), ww = tri(w), names = ["min", "avg", "max"];
+    for (var a = 0; a < 3; a++) for (var b = 0; b < 3; b++) {
+      if (a === 1 && b === 1) continue;
+      add(sex + "_" + names[a] + "_" + names[b], wm[a] * ww[b]);
+    }
     for (var j = 0; j < n; j++) { p[j * 3] *= SCALE; p[j * 3 + 1] = (p[j * 3 + 1] + YOFF) * SCALE; p[j * 3 + 2] *= SCALE; }
     return p;
   }
 
-  /* piecewise-linear map of a value through [lo, mid, hi] onto [-1, 0, 1] */
-  function axis(v, lo, mid, hi) {
-    var w = v <= mid ? (v - mid) / (mid - lo) : (v - mid) / (hi - mid);
-    return Math.max(-1, Math.min(1, w));
+  /* piecewise-linear map of a value through [lo, mid, hi] onto [0, 0.5, 1] */
+  function axis(v, lo, mid, hi, over) {
+    var w = v <= mid ? 0.5 * (v - lo) / (mid - lo) : 0.5 + 0.5 * (v - mid) / (hi - mid);
+    return Math.max(0, Math.min(over || 1, w));   /* `over` lets a value run past the grid's max */
   }
-  /* MakeHuman's "average weight" is a normal, slightly soft adult (roughly 22% male,
-     30% female); "min weight" is very lean, "max weight" is obese. */
-  function fatAxis(sex, bf)   { return sex === "male" ? axis(bf, 8, 22, 40) : axis(bf, 16, 30, 48); }
-  function muscleAxis(sex, ffmi) { return sex === "male" ? axis(ffmi, 15, 19, 24) : axis(ffmi, 12, 15.5, 19.5); }
+  /* Muscle from FFMI (lean mass / height^2): MakeHuman's max muscle is a
+     bodybuilder frame, min is no muscle at all. Weight from BMI: min weight is
+     underweight, max is obese. Body fat enters through both, because lean mass
+     and total mass together decide how much of the frame is fat. */
+  /* MakeHuman's max muscle is a fit, muscular frame at FFMI ~24; genuinely big
+     people (FFMI 26-28, a 200 lb man at 8%) sit past it, so the axis runs on to
+     1.35 and the max shape keeps scaling. Weight follows BMI, but a muscular
+     frame carries its mass at a higher BMI, so the middle shifts up with muscle. */
+  function muscleAxis(sex, ffmi) { return sex === "male" ? axis(ffmi, 15, 19.5, 24, 1.35) : axis(ffmi, 12, 15.5, 19.5, 1.35); }
+  function weightAxis(sex, bmi, m) {
+    var mid = (sex === "male" ? 22.5 : 22) + 4 * Math.min(1, Math.max(0, m));
+    return axis(bmi, mid - 7, mid, mid + 13, 1.15);
+  }
 
   var canvas = document.getElementById("figCanvas"), wrap = document.getElementById("figures");
   var renderer;
   try { renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true }); }
   catch (e) { return null; }
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.05;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   var scene = new THREE.Scene();
   var camera = new THREE.PerspectiveCamera(26, 1, 0.1, 50);
   camera.position.set(0, 0.05, 5.6);
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x5a5550, 0.9));
-  var key = new THREE.DirectionalLight(0xffffff, 0.75); key.position.set(2.5, 3, 4); scene.add(key);
-  var rim = new THREE.DirectionalLight(0xffffff, 0.35); rim.position.set(-3, 1, -3); scene.add(rim);
+  scene.add(new THREE.HemisphereLight(0xdfe6ee, 0x4a4340, 0.55));
+  var key = new THREE.DirectionalLight(0xfff2e6, 1.1); key.position.set(2.2, 3.2, 3.5);
+  key.castShadow = true; key.shadow.mapSize.set(1024, 1024); key.shadow.radius = 4;
+  key.shadow.camera.left = -2.2; key.shadow.camera.right = 2.2; key.shadow.camera.top = 2; key.shadow.camera.bottom = -2;
+  scene.add(key);
+  var fill = new THREE.DirectionalLight(0xcfe0ff, 0.35); fill.position.set(-3, 1.5, 2); scene.add(fill);
+  var rim = new THREE.DirectionalLight(0xffffff, 0.5); rim.position.set(-1.5, 2, -3.5); scene.add(rim);
+  var floor = new THREE.Mesh(new THREE.PlaneGeometry(8, 8), new THREE.ShadowMaterial({ opacity: 0.28 }));
+  floor.rotation.x = -Math.PI / 2; floor.position.y = -1.0; floor.receiveShadow = true; scene.add(floor);
 
   var geomTemplate = new THREE.BufferGeometry();
   geomTemplate.setIndex(new THREE.BufferAttribute(tris, 1));
-  geomTemplate.addGroup(D.groups.body[0], D.groups.body[1], 0);
-  geomTemplate.addGroup(D.groups.shorts[0], D.groups.shorts[1], 1);
-  geomTemplate.addGroup(D.groups.top[0], D.groups.top[1], 2);
-  var skin = new THREE.MeshStandardMaterial({ color: 0xbfae9e, roughness: 0.82, metalness: 0.0,
-    polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }); // sit just behind the shorts, no poke-through
-  var cloth = new THREE.MeshStandardMaterial({ color: 0x2a2a28, roughness: 0.95, metalness: 0.0 });
-  var top = new THREE.MeshStandardMaterial({ color: 0x2a2a28, roughness: 0.95, metalness: 0.0 }); // female figure only
+  var skin = new THREE.MeshStandardMaterial({ color: 0xc69c7b, roughness: 0.58, metalness: 0.0 });
 
   function makeFigure(x) {
     var g = geomTemplate.clone();
     g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(n * 3), 3));
-    var mesh = new THREE.Mesh(g, [skin, cloth, top]);
+    var mesh = new THREE.Mesh(g, skin);
+    mesh.castShadow = true;
     mesh.position.x = x;
     scene.add(mesh);
     return mesh;
@@ -548,11 +576,11 @@ var Body3D = (function () {
   var now = makeFigure(-0.62), goal = makeFigure(0.62);
   var group = [now, goal];
 
-  function setShape(mesh, sex, fatW, muscleW) {
-    var key = sex + ":" + fatW.toFixed(3) + ":" + muscleW.toFixed(3);
+  function setShape(mesh, sex, m, w) {
+    var key = sex + ":" + m.toFixed(3) + ":" + w.toFixed(3);
     if (mesh.userData.key === key) return;
     mesh.userData.key = key;
-    mesh.geometry.attributes.position.array.set(positions(sex, fatW, muscleW));
+    mesh.geometry.attributes.position.array.set(positions(sex, m, w));
     mesh.geometry.attributes.position.needsUpdate = true;
     mesh.geometry.computeVertexNormals();
   }
@@ -594,10 +622,9 @@ var Body3D = (function () {
   return {
     update: function (o) {
       var sex = o.sex === "female" ? "female" : "male";
-      var mw = muscleAxis(sex, o.ffmi);
-      top.visible = sex === "female";
-      setShape(now, sex, fatAxis(sex, o.bf), mw);
-      setShape(goal, sex, fatAxis(sex, o.goalBf), mw);
+      var m = muscleAxis(sex, o.ffmi);
+      setShape(now, sex, m, weightAxis(sex, o.bmiNow, m));
+      setShape(goal, sex, m, weightAxis(sex, o.bmiGoal, m));
       document.getElementById("figNowBf").textContent = (Math.round(o.bf * 10) / 10) + "%";
       document.getElementById("figGoalBf").textContent = (Math.round(o.goalBf * 10) / 10) + "%";
       if (!visible) fit(); else kick();
@@ -996,8 +1023,10 @@ var Body3D = (function () {
     renderCore();
     if (Body3D) {
       var bb = body();
-      var hm = state.heightCm / 100;
-      Body3D.update({ sex: state.sex, bf: state.bf, goalBf: state.goalBf, ffmi: hm > 0 ? (bb.lbm / LB_PER_KG) / (hm * hm) : 19 });
+      var hm = state.heightCm / 100, h2 = hm > 0 ? hm * hm : 3.1;
+      var goalKg = (bb.lbm / (1 - Math.min(0.99, Math.max(0, state.goalBf) / 100))) / LB_PER_KG;
+      Body3D.update({ sex: state.sex, bf: state.bf, goalBf: state.goalBf,
+        ffmi: (bb.lbm / LB_PER_KG) / h2, bmiNow: bb.kg / h2, bmiGoal: goalKg / h2 });
     }
   }
   function renderCore() {
