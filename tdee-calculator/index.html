@@ -369,7 +369,6 @@ input[type=range]::-moz-range-thumb{width:17px; height:17px; border-radius:50%; 
           </div>
 
           <div class="hint" id="goalHint"></div>
-          <div class="hint" id="goalDisclaimer" hidden></div>
 
         </div>
       </section>
@@ -942,9 +941,7 @@ input[type=range]::-moz-range-thumb{width:17px; height:17px; border-radius:50%; 
 
     var plan = buildPlan(b, avg);
     var stageLean = state.sex === "male" ? 6 : 14;
-    $("goalDisclaimer").hidden = !byBf;
     if (byBf) {
-      var keepLb = goalLbKeepingMuscle(b);
       $("goalDerivedLbl").textContent = "Goal weight";
       $("goalDerivedVal").textContent = toDisplay(plan.goalLb).toFixed(1) + " " + u;
       var verdictBf = state.goalBf < stageLean
@@ -957,15 +954,6 @@ input[type=range]::-moz-range-thumb{width:17px; height:17px; border-radius:50%; 
         toDisplay(plan.goalLb).toFixed(1) + " " + u + "</b>, which is <b>" +
         toDisplay(Math.abs(b.lb - plan.goalLb)).toFixed(1) + " " + u +
         (b.lb >= plan.goalLb ? "</b> to lose." : "</b> to gain.") + verdictBf;
-      var cat = categoryOf(state.bf), catBands = state.sex === "female"
-        ? { 1: "24% and under", 2: "25 to 34%", 3: "35% and over" }
-        : { 1: "15% and under", 2: "16 to 24%", 3: "25% and over" };
-      $("goalDisclaimer").innerHTML = state.goalBf < state.bf
-        ? "You start in <b>Category " + cat + "</b> (" + catBands[cat] + "). With protein high and training in place, Category 3 gives up almost no lean mass as it diets, " +
-          "Category 2 about 7.5% of what it loses, Category 1 about 12.5%. The number above walks you down through whichever categories you pass. " +
-          "If you hold your strength for the whole cut you will land higher on the scale than this, up to about <b>" +
-          toDisplay(keepLb).toFixed(1) + " " + u + "</b> at the same body fat."
-        : "Assumes the extra weight is fat on the lean mass you have now.";
     } else {
       var impliedFat = plan.goalLb - b.lbm;
       var impliedBf = impliedFat > 0 ? (impliedFat / plan.goalLb) * 100 : 0;
