@@ -4,6 +4,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import zlib from 'node:zlib';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), 'site');
 const PORT = Number(process.env.PORT) || 8080;
@@ -17,9 +18,14 @@ http.createServer((req, res) => {
     res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('Not found');
   }
   const ext = path.extname(file).toLowerCase();
-  res.writeHead(200, {
+  const headers = {
     'Content-Type': TYPES[ext] || 'application/octet-stream',
     'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=31536000, immutable',
-  });
-  fs.createReadStream(file).pipe(res);
+    'Vary': 'Accept-Encoding',
+  };
+  const gz = /\bgzip\b/.test(String(req.headers['accept-encoding'] || '')) && ['.html', '.css', '.js', '.svg', '.txt'].includes(ext);
+  if (gz) headers['Content-Encoding'] = 'gzip';
+  res.writeHead(200, headers);
+  const stream = fs.createReadStream(file);
+  (gz ? stream.pipe(zlib.createGzip({ level: 6 })) : stream).pipe(res);
 }).listen(PORT, () => console.log(`calculator on :${PORT}`));

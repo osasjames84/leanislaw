@@ -4,6 +4,7 @@
 The artifact platform supplies its own <!doctype>/<head>/<body> skeleton, so
 index.html is written as bare page content. A web host does not, hence this.
 Run after editing index.html:  python3 tdee-calculator/build.py
+Outputs site/index.html (served) and artifact.html (bare, for the Claude Artifact preview).
 """
 import io, os, re
 
@@ -21,37 +22,32 @@ FAVICON = ("data:image/svg+xml,"
 
 body = io.open(SRC, encoding="utf-8").read()
 
+# Inline the 3D figure data so both outputs are single files (the Artifact
+# host cannot load a sibling script; Railway could, but one file is simpler).
+DATA = os.path.join(HERE, "body-data.js")
+if os.path.exists(DATA):
+    body = body.replace('<script src="body-data.js"></script>',
+                        "<script>" + io.open(DATA, encoding="utf-8").read() + "</script>")
+
 # The <title> and font <link>s belong in <head>, not the body. Lift them out.
 head_bits = []
+page = body
 for pattern in (r"<title>.*?</title>\s*", r"<link [^>]*>\s*"):
-    for m in re.findall(pattern, body, flags=re.S):
+    for m in re.findall(pattern, page, flags=re.S):
         head_bits.append(m.strip())
-    body = re.sub(pattern, "", body, flags=re.S)
+    page = re.sub(pattern, "", page, flags=re.S)
 
-head_links = "\n  ".join(b for b in head_bits if b.startswith("<link"))
+html = ("<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n"
+        "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\">\n"
+        "<meta name=\"description\" content=\"" + DESC + "\">\n"
+        "<meta name=\"color-scheme\" content=\"light dark\">\n"
+        "<link rel=\"icon\" href=\"" + FAVICON + "\">\n"
+        + "\n".join(head_bits) + "\n</head>\n<body>\n" + page + "\n</body>\n</html>\n")
+os.makedirs(OUT_DIR, exist_ok=True)
+io.open(OUT, "w", encoding="utf-8").write(html)
+print("built %s (%d bytes)" % (OUT, len(html.encode("utf-8"))))
 
-page = """<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="color-scheme" content="light dark">
-  <title>{title}</title>
-  <meta name="description" content="{desc}">
-  <meta property="og:type" content="website">
-  <meta property="og:title" content="{title}">
-  <meta property="og:description" content="{desc}">
-  <meta name="twitter:card" content="summary">
-  <link rel="icon" href="{favicon}">
-  {links}
-</head>
-<body>
-{body}
-</body>
-</html>
-""".format(title=TITLE, desc=DESC, favicon=FAVICON, links=head_links, body=body.strip())
-
-if not os.path.isdir(OUT_DIR):
-    os.makedirs(OUT_DIR)
-io.open(OUT, "w", encoding="utf-8").write(page)
-print("built %s (%d bytes)" % (OUT, len(page)))
+# Bare version for publishing as a Claude Artifact (the host adds the skeleton).
+ART = os.path.join(HERE, "artifact.html")
+io.open(ART, "w", encoding="utf-8").write(body)
+print("built %s (%d bytes)" % (ART, len(body.encode("utf-8"))))
