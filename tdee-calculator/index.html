@@ -119,6 +119,7 @@ input[type=range]::-moz-range-thumb{width:17px; height:17px; border-radius:50%; 
 #figCanvas{display:block; width:100%; height:360px; touch-action:pan-y; cursor:grab}
 #figCanvas.dragging{cursor:grabbing}
 .fig-hint{padding:0 14px 12px}
+.fig-views{margin:0 14px 10px}
 @media (max-width:560px){#figCanvas{height:300px}}
 .hint{font-family:"IBM Plex Mono",monospace; font-size:11.5px; color:var(--ink-3)}
 .hint b{color:var(--ink-2); font-weight:500}
@@ -351,7 +352,12 @@ input[type=range]::-moz-range-thumb{width:17px; height:17px; border-radius:50%; 
           <div class="figures" id="figures" hidden>
             <div class="fig-labels"><span>Now <b id="figNowBf"></b></span><span>Goal <b id="figGoalBf"></b></span></div>
             <canvas id="figCanvas" aria-label="Your body now and at your goal, side by side"></canvas>
-            <div class="hint fig-hint">Drag to turn. Built from your lean mass and weight: more muscle on the frame, more or less fat on top of it. Close to real, not a scan of you.</div>
+            <div class="fig-views seg" role="group" aria-label="View">
+              <button type="button" data-view="0" aria-pressed="true">FRONT</button>
+              <button type="button" data-view="1.5707963" aria-pressed="false">SIDE</button>
+              <button type="button" data-view="3.1415927" aria-pressed="false">BACK</button>
+            </div>
+            <div class="hint fig-hint">Built from your lean mass and weight: more muscle on the frame, more or less fat on top of it. Close to real, not a scan of you. Drag to turn.</div>
           </div>
 
           <div class="field">
@@ -519,9 +525,9 @@ var Body3D = (function () {
   }
 
   /* piecewise-linear map of a value through [lo, mid, hi] onto [0, 0.5, 1] */
-  function axis(v, lo, mid, hi, over) {
+  function axis(v, lo, mid, hi, over, under) {
     var w = v <= mid ? 0.5 * (v - lo) / (mid - lo) : 0.5 + 0.5 * (v - mid) / (hi - mid);
-    return Math.max(0, Math.min(over || 1, w));   /* `over` lets a value run past the grid's max */
+    return Math.max(under || 0, Math.min(over || 1, w));   /* over/under let a value run past the grid */
   }
   /* Muscle from FFMI (lean mass / height^2): MakeHuman's max muscle is a
      bodybuilder frame, min is no muscle at all. Weight from BMI: min weight is
@@ -531,11 +537,13 @@ var Body3D = (function () {
      people (FFMI 26-28, a 200 lb man at 8%) sit past it, so the axis runs on to
      1.35 and the max shape keeps scaling. Weight follows BMI, but a muscular
      frame carries its mass at a higher BMI, so the middle shifts up with muscle. */
-  function muscleAxis(sex, ffmi) { return sex === "male" ? axis(ffmi, 15, 19.5, 24, 1.35) : axis(ffmi, 12, 15.5, 19.5, 1.35); }
-  function weightAxis(sex, bmi, m) {
-    var mid = (sex === "male" ? 22.5 : 22) + 4 * Math.min(1, Math.max(0, m));
-    return axis(bmi, mid - 7, mid, mid + 13, 1.15);
-  }
+  /* Body fat drives the weight axis directly: low body fat pulls toward the
+     "min weight" shape (tight skin, visible muscle), high body fat toward "max
+     weight" (soft, heavy). With max muscle on the frame, min weight is MakeHuman's
+     ripped corner. Both axes run past the grid so a real bodybuilder or a very
+     heavy person keeps changing instead of capping at "fit". */
+  function muscleAxis(sex, ffmi) { return sex === "male" ? axis(ffmi, 15, 19.5, 23, 1.9) : axis(ffmi, 12, 15.5, 19, 1.9); }
+  function weightAxis(sex, bf)   { return sex === "male" ? axis(bf, 5, 18, 38, 1.25, -0.25) : axis(bf, 12, 26, 46, 1.25, -0.25); }
 
   var canvas = document.getElementById("figCanvas"), wrap = document.getElementById("figures");
   var renderer;
@@ -550,19 +558,20 @@ var Body3D = (function () {
   var scene = new THREE.Scene();
   var camera = new THREE.PerspectiveCamera(26, 1, 0.1, 50);
   camera.position.set(0, 0.05, 5.6);
-  scene.add(new THREE.HemisphereLight(0xdfe6ee, 0x4a4340, 0.55));
-  var key = new THREE.DirectionalLight(0xfff2e6, 1.1); key.position.set(2.2, 3.2, 3.5);
+  scene.add(new THREE.HemisphereLight(0xdfe6ee, 0x3a3532, 0.35));
+  var key = new THREE.DirectionalLight(0xfff2e6, 1.45); key.position.set(3.2, 2.6, 2.4);
   key.castShadow = true; key.shadow.mapSize.set(1024, 1024); key.shadow.radius = 4;
   key.shadow.camera.left = -2.2; key.shadow.camera.right = 2.2; key.shadow.camera.top = 2; key.shadow.camera.bottom = -2;
   scene.add(key);
-  var fill = new THREE.DirectionalLight(0xcfe0ff, 0.35); fill.position.set(-3, 1.5, 2); scene.add(fill);
-  var rim = new THREE.DirectionalLight(0xffffff, 0.5); rim.position.set(-1.5, 2, -3.5); scene.add(rim);
+  var fill = new THREE.DirectionalLight(0xcfe0ff, 0.22); fill.position.set(-3, 1.2, 2.5); scene.add(fill);
+  var rim = new THREE.DirectionalLight(0xffffff, 0.7); rim.position.set(-2.5, 2.5, -3); scene.add(rim);
+  var rim2 = new THREE.DirectionalLight(0xffe9d6, 0.45); rim2.position.set(2.5, 1, -3); scene.add(rim2);
   var floor = new THREE.Mesh(new THREE.PlaneGeometry(8, 8), new THREE.ShadowMaterial({ opacity: 0.28 }));
   floor.rotation.x = -Math.PI / 2; floor.position.y = -1.0; floor.receiveShadow = true; scene.add(floor);
 
   var geomTemplate = new THREE.BufferGeometry();
   geomTemplate.setIndex(new THREE.BufferAttribute(tris, 1));
-  var skin = new THREE.MeshStandardMaterial({ color: 0xc69c7b, roughness: 0.58, metalness: 0.0 });
+  var skin = new THREE.MeshStandardMaterial({ color: 0xc49a7a, roughness: 0.42, metalness: 0.0 });
 
   function makeFigure(x) {
     var g = geomTemplate.clone();
@@ -585,15 +594,16 @@ var Body3D = (function () {
     mesh.geometry.computeVertexNormals();
   }
 
-  var rotY = Math.PI + 0.3, dragging = false, lastX = 0, autoSpin = !matchMedia("(prefers-reduced-motion: reduce)").matches;
-  var visible = false, raf = null, lastT = 0;
+  var rotY = 0, dragging = false, lastX = 0, autoSpin = false;   /* the mesh faces +z, toward the camera; still by default */
+  var visible = false, raf = null, lastT = 0, animTo = null;
   function draw(t) {
     raf = null;
     if (autoSpin && !dragging) rotY += 0.0022 * Math.min(32, (t - lastT) || 16);
+    if (animTo != null) { var d = animTo - rotY; if (Math.abs(d) < 0.01) { rotY = animTo; animTo = null; } else rotY += d * 0.18; }
     lastT = t;
     now.rotation.y = rotY; goal.rotation.y = rotY;
     renderer.render(scene, camera);
-    if (visible && (autoSpin || dragging)) raf = requestAnimationFrame(draw);
+    if (visible && (autoSpin || dragging || animTo != null)) raf = requestAnimationFrame(draw);
   }
   function kick() { if (!raf) raf = requestAnimationFrame(draw); }
 
@@ -606,8 +616,17 @@ var Body3D = (function () {
   }
   window.addEventListener("resize", fit);
 
+  document.querySelectorAll("[data-view]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var target = parseFloat(this.dataset.view);                     /* 0 front, PI/2 side, PI back */
+      var turns = Math.round((rotY - target) / (2 * Math.PI));         /* shortest way round */
+      animTo = target + turns * 2 * Math.PI;
+      document.querySelectorAll("[data-view]").forEach(function (x) { x.setAttribute("aria-pressed", x === b ? "true" : "false"); });
+      kick();
+    });
+  });
   canvas.addEventListener("pointerdown", function (e) { dragging = true; lastX = e.clientX; canvas.classList.add("dragging"); canvas.setPointerCapture(e.pointerId); kick(); });
-  canvas.addEventListener("pointermove", function (e) { if (!dragging) return; rotY += (e.clientX - lastX) * 0.012; lastX = e.clientX; kick(); });
+  canvas.addEventListener("pointermove", function (e) { if (!dragging) return; animTo = null; rotY += (e.clientX - lastX) * 0.012; lastX = e.clientX; kick(); });
   function stopDrag() { dragging = false; canvas.classList.remove("dragging"); kick(); }
   canvas.addEventListener("pointerup", stopDrag); canvas.addEventListener("pointercancel", stopDrag);
 
@@ -623,8 +642,8 @@ var Body3D = (function () {
     update: function (o) {
       var sex = o.sex === "female" ? "female" : "male";
       var m = muscleAxis(sex, o.ffmi);
-      setShape(now, sex, m, weightAxis(sex, o.bmiNow, m));
-      setShape(goal, sex, m, weightAxis(sex, o.bmiGoal, m));
+      setShape(now, sex, m, weightAxis(sex, o.bf));
+      setShape(goal, sex, m, weightAxis(sex, o.goalBf));
       document.getElementById("figNowBf").textContent = (Math.round(o.bf * 10) / 10) + "%";
       document.getElementById("figGoalBf").textContent = (Math.round(o.goalBf * 10) / 10) + "%";
       if (!visible) fit(); else kick();
