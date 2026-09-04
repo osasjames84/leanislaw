@@ -92,7 +92,7 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid 
 .hrow{display:flex; gap:6px; align-items:center}
 .hu{font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--ink-3); flex:none}
 
-.seg{display:inline-flex; background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:2px; gap:2px}
+.seg{display:inline-flex; align-self:flex-start; background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:2px; gap:2px}
 .seg button{border:0; background:transparent; cursor:pointer; padding:5px 12px; border-radius:6px; font-family:"IBM Plex Mono",monospace; font-size:12px; letter-spacing:.06em; color:var(--ink-2); white-space:nowrap}
 .seg button[aria-pressed="true"]{background:var(--surface); color:var(--ink); box-shadow:0 1px 2px rgba(0,0,0,.12)}
 
@@ -350,7 +350,7 @@ input[type=range]::-moz-range-thumb{width:17px; height:17px; border-radius:50%; 
               <label for="goalWeight">Goal weight</label>
               <input type="number" id="goalWeight" min="50" max="700" step="0.5" value="165" inputmode="decimal" enterkeyhint="done">
             </div>
-            <div class="field" id="goalBfField">
+            <div class="field" id="goalBfField" hidden>
               <label for="goalBf">Goal body fat %</label>
               <input type="number" id="goalBf" min="3" max="60" step="0.5" value="12" inputmode="decimal" enterkeyhint="done">
             </div>
@@ -378,6 +378,7 @@ input[type=range]::-moz-range-thumb{width:17px; height:17px; border-radius:50%; 
           </div>
 
           <div class="hint" id="goalHint"></div>
+          <div class="hint" id="goalDisclaimer" hidden></div>
 
         </div>
       </section>
@@ -566,23 +567,35 @@ input[type=range]::-moz-range-thumb{width:17px; height:17px; border-radius:50%; 
      through the lean mass you have now (lbm stays, fat mass changes). Whichever
      one was edited last is the source; the other follows it. */
   var round1 = function (n) { return Math.round(n * 10) / 10; };
-  function goalWeightFromBf(b) {
-    var f = clamp(state.goalBf, 0, 99) / 100;
-    return toDisplay(b.lbm / (1 - f));            /* display units */
+  /* Goal by BODY FAT: the weight you land at if what you lose is 80% fat and
+     20% lean mass (the usual split on a sensible cut). Solve for total loss W:
+       goalBf = (fm - 0.8W) / (lb - W)  ->  W = (fm - g*lb) / (0.8 - g)
+     If the goal is a higher body fat than now, treat it as fat gained on the
+     same lean mass. Returns pounds. */
+  function goalLbFromBf80(b) {
+    var g = clamp(state.goalBf, 0, 79) / 100;
+    if (g >= state.bf / 100) return b.lbm / (1 - g);
+    var W = (b.fm - g * b.lb) / (0.8 - g);
+    return Math.max(b.lbm * 0.5, b.lb - W);
   }
+  /* the weight you land at if you keep every bit of lean mass (the ceiling) */
+  function goalLbKeepingMuscle(b) {
+    var g = clamp(state.goalBf, 0, 99) / 100;
+    return b.lbm / (1 - g);
+  }
+  /* body fat implied by a typed goal weight, keeping lean mass */
   function goalBfFromWeight(b) {
     var goalLb = state.unit === "lb" ? state.goalWeight : state.goalWeight * LB_PER_KG;
     return goalLb > 0 ? clamp(((goalLb - b.lbm) / goalLb) * 100, 0, 99) : 0;
   }
-  function reconcileGoal() {
-    var b = body();
-    if (state.goalMode === "bf") state.goalWeight = round1(goalWeightFromBf(b));
-    else state.goalBf = round1(goalBfFromWeight(b));
+  /* the goal the plan works toward, in pounds, whichever way it was set */
+  function goalTargetLb(b) {
+    if (state.goalMode === "bf") return goalLbFromBf80(b);
+    return state.unit === "lb" ? state.goalWeight : state.goalWeight * LB_PER_KG;
   }
   document.querySelectorAll("[data-goalmode]").forEach(function (b) {
     b.addEventListener("click", function () {
-      state.goalMode = this.dataset.goalmode === "bf" ? "bf" : "weight";
-      reconcileGoal();   /* the newly chosen field starts from the value the other one implied */
+      state.goalMode = this.dataset.goalmode === "bf" ? "bf" : "weight";   /* each box keeps its own number */
       syncInputs(); render();
     });
   });
@@ -724,8 +737,8 @@ input[type=range]::-moz-range-thumb{width:17px; height:17px; border-radius:50%; 
   function calorieFloor() { return state.sex === "male" ? 1500 : 1200; }
 
   function buildPlan(b, avg) {
-    var goalLb = state.unit === "lb" ? state.goalWeight : state.goalWeight * LB_PER_KG;
-    var deltaLb = b.lb - goalLb;                 /* positive means fat to lose */
+    var goalLb = goalTargetLb(b);
+    var deltaLb = b.lb - goalLb;                 /* positive means weight to lose */
     var days = planDays();
     var weeks = days / 7;
     var dir = Math.abs(deltaLb) < 0.5 ? "hold" : (deltaLb > 0 ? "lose" : "gain");
@@ -908,9 +921,7 @@ input[type=range]::-moz-range-thumb{width:17px; height:17px; border-radius:50%; 
         '</span></span><span class="n">' + fmt(r.v) + "</span></div>";
     }).join("");
 
-    /* goal: keep weight and body fat in step, then write back the derived one
-       (never the field being typed in, so the caret is left alone) */
-    reconcileGoal();
+    /* goal: one box is typed in, the other is shown as the worked-out value */
     var byBf = state.goalMode === "bf";
     var active = document.activeElement && document.activeElement.id;
     if (active !== "goalWeight") $("goalWeight").value = state.goalWeight;
@@ -918,39 +929,45 @@ input[type=range]::-moz-range-thumb{width:17px; height:17px; border-radius:50%; 
     $("goalWeightField").hidden = byBf;
     $("goalBfField").hidden = !byBf;
     document.querySelectorAll("[data-goalmode]").forEach(function (x) { x.setAttribute("aria-pressed", (x.dataset.goalmode === "bf") === byBf ? "true" : "false"); });
-    $("goalDerivedLbl").textContent = byBf ? "Works out to" : "Works out to";
-    $("goalDerivedVal").textContent = byBf
-      ? state.goalWeight.toFixed(1) + " " + u + " goal weight"
-      : state.goalBf.toFixed(1) + "% body fat";
 
     var plan = buildPlan(b, avg);
-    var impliedFat = plan.goalLb - b.lbm;
     var stageLean = state.sex === "male" ? 6 : 14;
-    if (!byBf && impliedFat <= 0) {
-      $("goalHint").className = "hint alert";
-      $("goalHint").innerHTML = "You carry <b>" + toDisplay(b.lbm).toFixed(1) + " " + u +
-        "</b> of lean mass, so that goal weight is below your own skeleton and muscle. " +
-        "Pick something above it, or accept you would be giving up muscle to get there.";
-    } else if (byBf) {
+    $("goalDisclaimer").hidden = !byBf;
+    if (byBf) {
+      var keepLb = goalLbKeepingMuscle(b);
+      $("goalDerivedLbl").textContent = "Goal weight";
+      $("goalDerivedVal").textContent = toDisplay(plan.goalLb).toFixed(1) + " " + u;
       var verdictBf = state.goalBf < stageLean
         ? " That is competition-stage lean and very hard to hold."
         : (state.goalBf > state.bf
           ? " That is more fat on the same muscle. If the plan is to gain, set a goal weight instead so the surplus has somewhere better to go."
           : "");
       $("goalHint").className = "hint" + (state.goalBf < stageLean ? " alert" : "");
-      $("goalHint").innerHTML = "Keeping the muscle you have, <b>" + state.goalBf.toFixed(1) +
-        "%</b> body fat means weighing about <b>" + toDisplay(plan.goalLb).toFixed(1) + " " + u +
-        "</b>, which is <b>" + toDisplay(Math.abs(b.lb - plan.goalLb)).toFixed(1) + " " + u +
-        (b.lb >= plan.goalLb ? "</b> of fat to lose." : "</b> to gain.") + verdictBf;
+      $("goalHint").innerHTML = "<b>" + state.goalBf.toFixed(1) + "%</b> body fat puts you at about <b>" +
+        toDisplay(plan.goalLb).toFixed(1) + " " + u + "</b>, which is <b>" +
+        toDisplay(Math.abs(b.lb - plan.goalLb)).toFixed(1) + " " + u +
+        (b.lb >= plan.goalLb ? "</b> to lose." : "</b> to gain.") + verdictBf;
+      $("goalDisclaimer").innerHTML = state.goalBf < state.bf
+        ? "Assumes about 80% of what you lose is fat and 20% is lean mass, which is typical on a cut. If you hold on to all your strength you will land higher, up to about <b>" +
+          toDisplay(keepLb).toFixed(1) + " " + u + "</b> at the same body fat."
+        : "Assumes the extra weight is fat on the lean mass you have now.";
     } else {
-      var impliedBf = (impliedFat / plan.goalLb) * 100;
-      var verdict = impliedBf < stageLean
-        ? " That is competition-stage lean and very hard to hold."
-        : "";
-      $("goalHint").className = "hint";
-      $("goalHint").innerHTML = "Holding onto the muscle you have, <b>" +
-        toDisplay(plan.goalLb).toFixed(1) + " " + u + "</b> puts you at about <b>" +
-        impliedBf.toFixed(1) + "%</b> body fat." + verdict;
+      var impliedFat = plan.goalLb - b.lbm;
+      var impliedBf = impliedFat > 0 ? (impliedFat / plan.goalLb) * 100 : 0;
+      $("goalDerivedLbl").textContent = "Goal body fat";
+      $("goalDerivedVal").textContent = impliedFat > 0 ? impliedBf.toFixed(1) + "%" : "below lean mass";
+      if (impliedFat <= 0) {
+        $("goalHint").className = "hint alert";
+        $("goalHint").innerHTML = "You carry <b>" + toDisplay(b.lbm).toFixed(1) + " " + u +
+          "</b> of lean mass, so that goal weight is below your own skeleton and muscle. " +
+          "Pick something above it, or accept you would be giving up muscle to get there.";
+      } else {
+        var verdict = impliedBf < stageLean ? " That is competition-stage lean and very hard to hold." : "";
+        $("goalHint").className = "hint";
+        $("goalHint").innerHTML = "Holding onto the muscle you have, <b>" +
+          toDisplay(plan.goalLb).toFixed(1) + " " + u + "</b> puts you at about <b>" +
+          impliedBf.toFixed(1) + "%</b> body fat." + verdict;
+      }
     }
 
     $("planTarget").textContent = fmt(plan.target);
