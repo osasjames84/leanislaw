@@ -567,16 +567,35 @@ input[type=range]::-moz-range-thumb{width:17px; height:17px; border-radius:50%; 
      through the lean mass you have now (lbm stays, fat mass changes). Whichever
      one was edited last is the source; the other follows it. */
   var round1 = function (n) { return Math.round(n * 10) / 10; };
-  /* Goal by BODY FAT: the weight you land at if what you lose is 80% fat and
-     20% lean mass (the usual split on a sensible cut). Solve for total loss W:
-       goalBf = (fm - 0.8W) / (lb - W)  ->  W = (fm - g*lb) / (0.8 - g)
+  /* Goal by BODY FAT, category system. Where you start decides how much of
+     what you lose is lean mass, assuming protein is high and you are training:
+       Category 3 (high body fat)  -> almost none of the loss is lean mass
+       Category 2 (middle)         -> about 7.5% of the loss
+       Category 1 (already lean)   -> about 12.5% of the loss
+     A cut can cross categories, so walk the weight down in small steps and
+     apply the share for the category you are in at each step. Returns pounds.
      If the goal is a higher body fat than now, treat it as fat gained on the
-     same lean mass. Returns pounds. */
-  function goalLbFromBf80(b) {
+     lean mass you have. */
+  var CATS = {
+    male:   [[15, 1], [24, 2], [1e9, 3]],     /* [upper bf% of the category, category] */
+    female: [[24, 1], [34, 2], [1e9, 3]]
+  };
+  var LBM_SHARE = { 1: 0.125, 2: 0.075, 3: 0.025 };
+  function categoryOf(bf) {
+    var t = CATS[state.sex === "female" ? "female" : "male"];
+    for (var i = 0; i < t.length; i++) if (bf <= t[i][0]) return t[i][1];
+    return 3;
+  }
+  function goalLbFromBfCategories(b) {
     var g = clamp(state.goalBf, 0, 79) / 100;
     if (g >= state.bf / 100) return b.lbm / (1 - g);
-    var W = (b.fm - g * b.lb) / (0.8 - g);
-    return Math.max(b.lbm * 0.5, b.lb - W);
+    var lb = b.lb, fm = b.fm, step = 0.25, guard = 0;
+    while (lb > 0 && fm / lb > g && guard++ < 4000) {
+      var share = LBM_SHARE[categoryOf((fm / lb) * 100)];
+      fm -= step * (1 - share);
+      lb -= step;
+    }
+    return Math.max(b.lbm * 0.5, lb);
   }
   /* the weight you land at if you keep every bit of lean mass (the ceiling) */
   function goalLbKeepingMuscle(b) {
@@ -590,7 +609,7 @@ input[type=range]::-moz-range-thumb{width:17px; height:17px; border-radius:50%; 
   }
   /* the goal the plan works toward, in pounds, whichever way it was set */
   function goalTargetLb(b) {
-    if (state.goalMode === "bf") return goalLbFromBf80(b);
+    if (state.goalMode === "bf") return goalLbFromBfCategories(b);
     return state.unit === "lb" ? state.goalWeight : state.goalWeight * LB_PER_KG;
   }
   document.querySelectorAll("[data-goalmode]").forEach(function (b) {
@@ -947,8 +966,13 @@ input[type=range]::-moz-range-thumb{width:17px; height:17px; border-radius:50%; 
         toDisplay(plan.goalLb).toFixed(1) + " " + u + "</b>, which is <b>" +
         toDisplay(Math.abs(b.lb - plan.goalLb)).toFixed(1) + " " + u +
         (b.lb >= plan.goalLb ? "</b> to lose." : "</b> to gain.") + verdictBf;
+      var cat = categoryOf(state.bf), catBands = state.sex === "female"
+        ? { 1: "24% and under", 2: "25 to 34%", 3: "35% and over" }
+        : { 1: "15% and under", 2: "16 to 24%", 3: "25% and over" };
       $("goalDisclaimer").innerHTML = state.goalBf < state.bf
-        ? "Assumes about 80% of what you lose is fat and 20% is lean mass, which is typical on a cut. If you hold on to all your strength you will land higher, up to about <b>" +
+        ? "You start in <b>Category " + cat + "</b> (" + catBands[cat] + "). With protein high and training in place, Category 3 gives up almost no lean mass as it diets, " +
+          "Category 2 about 7.5% of what it loses, Category 1 about 12.5%. The number above walks you down through whichever categories you pass. " +
+          "If you hold your strength for the whole cut you will land higher on the scale than this, up to about <b>" +
           toDisplay(keepLb).toFixed(1) + " " + u + "</b> at the same body fat."
         : "Assumes the extra weight is fat on the lean mass you have now.";
     } else {
