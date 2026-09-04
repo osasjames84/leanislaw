@@ -69,6 +69,7 @@ h1{
 .panel-bd{padding:14px 18px 18px; display:flex; flex-direction:column; gap:14px}
 
 .field{display:flex; flex-direction:column; gap:6px}
+[hidden]{display:none!important}
 label,.lbl{font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:10.5px; font-weight:500; letter-spacing:.13em; text-transform:uppercase; color:var(--ink-3)}
 input[type=number],input[type=date],select{
   width:100%; background:var(--page); border:1px solid var(--border); border-radius:8px;
@@ -110,9 +111,8 @@ input[type=range]::-moz-range-thumb{width:17px; height:17px; border-radius:50%; 
 .block-hd .t{font-family:Archivo,sans-serif; font-variation-settings:"wdth" 103,"wght" 620; font-size:13px; text-transform:uppercase; letter-spacing:.03em}
 .block input,.block select{background:var(--surface)}
 
-.field label .note{font-family:"IBM Plex Mono",monospace; font-size:10px; font-weight:400; letter-spacing:.04em; text-transform:uppercase; color:var(--ink-3); margin-left:6px}
-.field.derived-in label .note{color:var(--accent)}
-.field.derived-in input{color:var(--ink-2)}
+.derived-val{font-family:"IBM Plex Mono",monospace; font-size:15px; color:var(--accent); padding:10px 0 0; font-variant-numeric:tabular-nums}
+.field.derived-out .lbl{color:var(--ink-3)}
 .hint{font-family:"IBM Plex Mono",monospace; font-size:11.5px; color:var(--ink-3)}
 .hint b{color:var(--ink-2); font-weight:500}
 .hint.alert{color:var(--bad)}
@@ -329,17 +329,27 @@ input[type=range]::-moz-range-thumb{width:17px; height:17px; border-radius:50%; 
         <div class="panel-hd"><span class="step">STEP 4</span><h2>Your goal</h2><span class="term">where you want to be</span></div>
         <div class="panel-bd">
 
+          <div class="field">
+            <span class="lbl">Set your goal by</span>
+            <div class="seg" role="group" aria-label="Set your goal by">
+              <button type="button" data-goalmode="weight" aria-pressed="true">WEIGHT</button>
+              <button type="button" data-goalmode="bf" aria-pressed="false">BODY FAT</button>
+            </div>
+          </div>
           <div class="row">
             <div class="field" id="goalWeightField">
-              <label for="goalWeight">Goal weight <span class="note" id="goalWeightNote"></span></label>
+              <label for="goalWeight">Goal weight</label>
               <input type="number" id="goalWeight" min="50" max="700" step="0.5" value="165" inputmode="decimal" enterkeyhint="done">
             </div>
             <div class="field" id="goalBfField">
-              <label for="goalBf">Goal body fat <span class="note" id="goalBfNote"></span></label>
+              <label for="goalBf">Goal body fat %</label>
               <input type="number" id="goalBf" min="3" max="60" step="0.5" value="12" inputmode="decimal" enterkeyhint="done">
             </div>
+            <div class="field derived-out" id="goalDerived">
+              <span class="lbl" id="goalDerivedLbl">Works out to</span>
+              <div class="derived-val" id="goalDerivedVal">&nbsp;</div>
+            </div>
           </div>
-          <div class="hint" id="goalLinkHint">Set either one. The other is worked out from the muscle you have now.</div>
 
           <div class="field">
             <span class="lbl">Timeframe</span>
@@ -560,6 +570,13 @@ input[type=range]::-moz-range-thumb{width:17px; height:17px; border-radius:50%; 
     if (state.goalMode === "bf") state.goalWeight = round1(goalWeightFromBf(b));
     else state.goalBf = round1(goalBfFromWeight(b));
   }
+  document.querySelectorAll("[data-goalmode]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      state.goalMode = this.dataset.goalmode === "bf" ? "bf" : "weight";
+      reconcileGoal();   /* the newly chosen field starts from the value the other one implied */
+      syncInputs(); render();
+    });
+  });
   $("goalWeight").addEventListener("input", function () {
     var v = parseFloat(this.value);
     state.goalWeight = isNaN(v) ? 0 : clamp(v, 0, 700);
@@ -889,10 +906,13 @@ input[type=range]::-moz-range-thumb{width:17px; height:17px; border-radius:50%; 
     var active = document.activeElement && document.activeElement.id;
     if (active !== "goalWeight") $("goalWeight").value = state.goalWeight;
     if (active !== "goalBf") $("goalBf").value = state.goalBf;
-    $("goalWeightField").classList.toggle("derived-in", byBf);
-    $("goalBfField").classList.toggle("derived-in", !byBf);
-    $("goalWeightNote").textContent = byBf ? "from body fat" : "";
-    $("goalBfNote").textContent = byBf ? "" : "from weight";
+    $("goalWeightField").hidden = byBf;
+    $("goalBfField").hidden = !byBf;
+    document.querySelectorAll("[data-goalmode]").forEach(function (x) { x.setAttribute("aria-pressed", (x.dataset.goalmode === "bf") === byBf ? "true" : "false"); });
+    $("goalDerivedLbl").textContent = byBf ? "Works out to" : "Works out to";
+    $("goalDerivedVal").textContent = byBf
+      ? state.goalWeight.toFixed(1) + " " + u + " goal weight"
+      : state.goalBf.toFixed(1) + "% body fat";
 
     var plan = buildPlan(b, avg);
     var impliedFat = plan.goalLb - b.lbm;
