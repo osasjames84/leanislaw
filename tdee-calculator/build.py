@@ -22,13 +22,6 @@ FAVICON = ("data:image/svg+xml,"
 
 body = io.open(SRC, encoding="utf-8").read()
 
-# Inline the 3D figure data so both outputs are single files (the Artifact
-# host cannot load a sibling script; Railway could, but one file is simpler).
-DATA = os.path.join(HERE, "body-data.js")
-if os.path.exists(DATA):
-    body = body.replace('<script src="body-data.js"></script>',
-                        "<script>" + io.open(DATA, encoding="utf-8").read() + "</script>")
-
 # The <title> and font <link>s belong in <head>, not the body. Lift them out.
 head_bits = []
 page = body
